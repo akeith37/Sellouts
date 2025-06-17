@@ -6,6 +6,7 @@ import signal
 import smtplib
 import shutil
 import tempfile
+import random
 from datetime import datetime
 from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
@@ -13,6 +14,7 @@ from dotenv import load_dotenv
 import warnings
 from pyppeteer import launch
 import pyppeteer
+from pyppeteer import stealth 
 
 
 #Suppress Pyppeteer shutdown coroutine warning
@@ -27,15 +29,13 @@ EMAIL_PASSWORD=os.getenv("EMAIL_PASSWORD")
 RECIPIENT_EMAIL=os.getenv("RECIPIENT_EMAIL")
 CHECK_INTERVAL=60 #seconds between checking again
 TICKET_URL="https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
-#LZZY#"https://www.ticketmaster.co.uk/halestorm-glasgow-21-11-2025/event/3600628EEF705D6B"
-#BS#"https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
 
-#Set temp profle for browser state
-shutdown_event = asyncio.Event()
-temp_user_data_dir = tempfile.mkdtemp() #Create temporary user data directory
+shutdown_event = asyncio.Event() # Event to signal shutdown
+user_data_dir = os.path.join(os.getcwd(), 'user_data') # Set up a persistent user-data directory to keep cookies/session
+os.makedirs(user_data_dir, exist_ok=True)
 
 # ---- Email Alert
-async def send_email_alert(details, logfile):
+async def send_email_alert(details, log_file):
     subject = "Tickets Available!"
     body = f"Tickets have been found!\n{TICKET_URL}\n\nDetails:\n"
     body += "\n".join(details) if details else "(No extra details found)"
@@ -56,10 +56,39 @@ async def send_email_alert(details, logfile):
         with open(log_file, "a") as f:
             f.write(f"[{datetime.now()}] EMAIL FAILED TO SEND: {e}\n\n")
 
+# ---- Function to emulate human-like interaction in the browser
+async def human_like_interaction(page):
+    """
+    Simulate some realistic user interactions:
+    - Random mouse movements across the page
+    - Scroll down then up
+    - Small pauses between actions
+    """
+    # Get current viewport size for bounds
+    vp = page.viewport
+    width, height = vp['width'], vp['height']
+
+    # Random mouse movements (1–3 moves)
+    for _ in range(random.randint(1, 3)):
+        x = random.randint(100, width - 100)
+        y = random.randint(100, height - 100)
+        # Move in small interpolated steps
+        await page.mouse.move(x, y, steps=random.randint(10, 25))
+        await asyncio.sleep(random.uniform(0.5, 1.5))
+
+    # Simulate scrolling down
+    down = random.randint(200, height - 200)
+    await page.evaluate(f"window.scrollBy(0, {down});")
+    await asyncio.sleep(random.uniform(0.5, 1.0))
+
+    # Then scroll back up half that distance
+    await page.evaluate(f"window.scrollBy(0, -{int(down/2)});")
+    await asyncio.sleep(random.uniform(0.5, 1.0))
+
 # ---- Ticket availability check logic ---- 
 async def check_ticket_availability(html_content, log_file):
     soup = BeautifulSoup(html_content, "html.parser")
-    ticket_detils = []
+    ticket_details = []
     match_layers = []
     layer_results = []
         
@@ -143,7 +172,8 @@ async def check_ticket_availability(html_content, log_file):
     except Exception as e:
         layer_results.append(f"[Layer 4] ticket-list UI: error - {e}")
         
-    found = bool(match_layers)
+    # Only consider tickets found if Layer 1 passes
+    found = "Layer 1" in match_layers
     
     with open(log_file, "a") as f:
         f.write(f"[{datetime.now()}] CHECK RESULT: {'FOUND' if found else 'NONE'}\n")
@@ -166,7 +196,7 @@ async def check_tickets_loop(browser, page):
             found, details = await check_ticket_availability(html, log_file)
             if found:
                 await send_email_alert(details, log_file)
-                break # i dont think i want this, probably stops the program once found
+                # break  # i dont think i want this, probably stops the program once found
             else:
                 print("No tickets found.")
         except asyncio.TimeoutError:
@@ -182,37 +212,15 @@ async def check_tickets_loop(browser, page):
 # ---- Shutdown and Cleanup ----
 async def shutdown(browser):
     print("Shutting down...")
-    try:
-        if browser:
-            await browser.close()
-            print("Browser clsoed.")
-    finally:
-        shutil.rmtree(temp_user_data_dir, ignore_errors=True)
+    if browser:
+        await browser.close()
+        print("Browser closed.")
+    # If you want to clear user data on exit, uncomment the following line:
+    # shutil.rmtree(user_data_dir, ignore_errors=True)
         
 # ---- Entry Point ----
 async def main():
-    browser = await launch({
-        "headless": False,
-        "userDataDir": temp_user_data_dir, #Store cookies/session info
-        "args": [
-                "--start-maximied",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled"
-            ],
-        "executablePath": "/usr/bin/chromium"
-    })
-    page = (await browser.pages())[0]
-#     await page.set_viewport_size({"width": 1280, "height": 800})
-    await page.setExtraHTTPHeaders({
-        "User-Agent": "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.36"
-    })
-    await page.goto(TICKET_URL, {'waitUntil': 'networkidle2'})
-    print("Check broswer for CAPTCHA. Verify that you exist, wait for the next page to load, hit ENTER in the terminal to collect the HTML content")
-    input()
-    await page.waitForSelector("script[type='application/ld+json']")
-    
+    # Set up signal handlers for graceful shutdown
     def handle_signal(sig, frame):
         print(f"Signal {sig} received. Shutdown requested...")
         shutdown_event.set()
@@ -220,10 +228,57 @@ async def main():
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
+    # Launch the browser with stealth mode
+    browser = await launch({
+        "headless": False,
+        "userDataDir": user_data_dir, #Store cookies/session info
+        "args": [
+                "--start-maximied",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-infobars",
+            ],
+        "ignoreDefaultArgs": ["--enable-automation"],
+    })
+    page = (await browser.pages())[0]
+    await page.set_viewport_size({"width": 1920, "height": 1080})
+    await page.setUserAgent(
+        'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+        'AppleWebKit/537.36 (KHTML, like Gecko) '
+        'Chrome/114.0.5735.110 Safari/537.36'
+    )
+
+    # Apply stealth mode to avoid detection
+    await stealth(page)
+
+    # Add additional stealth features
+    await page.evaluateOnNewDocument("""
+    // Hide webdriver flag entirely
+    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+    // Set typical language preferences
+    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
+    // Fake a non-empty plugins array
+    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
+    // Match platform to the UA string
+    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
+    // Provide realistic hardware info
+    Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
+    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 4 });
+    """)
+
+    await human_like_interaction(page)
+    await page.goto(TICKET_URL, {'waitUntil': 'networkidle2'})
+    await human_like_interaction(page)
+    print("Check broswer for CAPTCHA. Verify that you exist, wait for the next page to load, hit ENTER in the terminal to collect the HTML content")
+    input()
+    await page.waitForSelector("script[type='application/ld+json']")
+
     try:
         await check_tickets_loop(browser, page)
     finally:
         await shutdown(browser)
         
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.get_event_loop().run_until_complete(main())
