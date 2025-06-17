@@ -83,7 +83,7 @@ async def check_ticket_availability(html_content, log_file):
             
     # Layer 3: JSON-LD ticket offer
     try:
-        scripts = soup.findall("script", type="application/ld+json")
+        scripts = soup.find_all("script", type="application/ld+json")
         found_in_json = False
         for script in scripts:
             try:

@@ -57,8 +57,8 @@ async def send_email_alert(details, logfile):
             f.write(f"[{datetime.now()}] EMAIL FAILED TO SEND: {e}\n\n")
 
 # ---- Ticket availability check logic ---- 
-async def check_ticket_availability(html_content):
-    soup = BeautifulSoup(html_content,"html.parser")
+async def check_ticket_availability(html_content, log_file):
+    soup = BeautifulSoup(html_content, "html.parser")
     ticket_detils = []
     match_layers = []
     layer_results = []
@@ -76,7 +76,7 @@ async def check_ticket_availability(html_content):
         else:
             layer_results.append("[Layer 1] resultCount: span not found")
     except Exception as e:
-        later_results.append(f"[Layer 1] resultCount: error - {e}")
+        layer_results.append(f"[Layer 1] resultCount: error - {e}")
             
     # Layer 2: Sold-Out Banner
     try:
@@ -91,7 +91,7 @@ async def check_ticket_availability(html_content):
             
     # Layer 3: JSON-LD ticket offer
     try:
-        scripts = soup.findall("script", type="application/ld+json")
+        scripts = soup.find_all("script", type="application/ld+json")
         found_in_json = False
         for script in scripts:
             try:
