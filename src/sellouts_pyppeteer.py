@@ -30,6 +30,11 @@ RECIPIENT_EMAIL=os.getenv("RECIPIENT_EMAIL")
 CHECK_INTERVAL=60 #seconds between checking again
 TICKET_URL="https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
 
+# Check for required environment variables
+required_env_vars = [EMAIL_ADDRESS, EMAIL_PASSWORD, RECIPIENT_EMAIL]
+if not all(required_env_vars):
+    raise EnvironmentError("One or more required environment variables (EMAIL_ADDRESS, EMAIL_PASSWORD, RECIPIENT_EMAIL) are missing.")
+
 shutdown_event = asyncio.Event() # Event to signal shutdown
 user_data_dir = os.path.join(os.getcwd(), 'user_data') # Set up a persistent user-data directory to keep cookies/session
 os.makedirs(user_data_dir, exist_ok=True)
@@ -65,8 +70,12 @@ async def human_like_interaction(page):
     - Small pauses between actions
     """
     # Get current viewport size for bounds
-    vp = page.viewport
-    width, height = vp['width'], vp['height']
+    try:
+        vp = page.viewport
+        width, height = vp['width'], vp['height']
+    except Exception as e:
+        print(f"Could not get viewport size: {e}")
+        return
 
     # Random mouse movements (1–3 moves)
     for _ in range(random.randint(1, 3)):
@@ -124,34 +133,36 @@ async def check_ticket_availability(html_content, log_file):
         found_in_json = False
         for script in scripts:
             try:
+                if not script.string:
+                    continue
                 data = json.loads(script.string.strip())
                 entries = data if isinstance(data, list) else [data]
                 for entry in entries:
                     if entry.get("@type") != "MusicEvent":
                         continue
-                offers = entry.get("offers")
-                if not offers:
-                    continue
-                offers = offers if isinstance(offers, list) else [offers]
-                for offer in offers:
-                    if not isinstance(offer, dict):
+                    offers = entry.get("offers")
+                    if not offers:
                         continue
-                    availability = offer.get("availability")
-                    url = offer.get("url")
-                    price = offer.get("price")
-                    currency = offer.get("priceCurrency")
-                    location = offer.get("name") or offer.get("category") or offer.get("description")
-                    if (
-                        availability == "http://schema.org/InStock"
-                        and isinstance(url, str)
-                        and "ticketmaster.co.uk" in url.lower()
-                        and "event" in url.lower()
-                        and price
-                    ):
-                        detail = f"- Price: {price or 'Unavailable'} {currency or ''} | Location: {location or 'N/A'}"
-                        ticket_details.append(detail)
-                        found_in_json = True
-            except:
+                    offers = offers if isinstance(offers, list) else [offers]
+                    for offer in offers:
+                        if not isinstance(offer, dict):
+                            continue
+                        availability = offer.get("availability")
+                        url = offer.get("url")
+                        price = offer.get("price")
+                        currency = offer.get("priceCurrency")
+                        location = offer.get("name") or offer.get("category") or offer.get("description")
+                        if (
+                            availability == "http://schema.org/InStock"
+                            and isinstance(url, str)
+                            and "ticketmaster.co.uk" in url.lower()
+                            and "event" in url.lower()
+                            and price
+                        ):
+                            detail = f"- Price: {price or 'Unavailable'} {currency or ''} | Location: {location or 'N/A'}"
+                            ticket_details.append(detail)
+                            found_in_json = True
+            except Exception as e:
                 continue
         if found_in_json:
             match_layers.append("Layer 3")
@@ -202,7 +213,9 @@ async def check_tickets_loop(browser, page):
         except asyncio.TimeoutError:
             print("Timed out waiting for page load or selector.")
         except Exception as e:
+            import traceback
             print("Unexpected error:", e)
+            traceback.print_exc()
         print(f"Waiting {CHECK_INTERVAL} seconds...\n")
         try:
             await asyncio.wait_for(shutdown_event.wait(), timeout=CHECK_INTERVAL)
@@ -233,7 +246,7 @@ async def main():
         "headless": False,
         "userDataDir": user_data_dir, #Store cookies/session info
         "args": [
-                "--start-maximied",
+                "--start-maximized",
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
