@@ -14,7 +14,7 @@ from dotenv import load_dotenv
 import warnings
 import pyppeteer
 from pyppeteer import launch
-from pyppeteer import stealth 
+from pyppeteer_stealth import stealth
 from python_ghost_cursor.pyppeteer import create_cursor 
 
 
