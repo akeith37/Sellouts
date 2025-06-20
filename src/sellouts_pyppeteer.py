@@ -12,9 +12,10 @@ from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
 import warnings
-from pyppeteer import launch
 import pyppeteer
+from pyppeteer import launch
 from pyppeteer import stealth 
+from python_ghost_cursor.pyppeteer import create_cursor 
 
 
 #Suppress Pyppeteer shutdown coroutine warning
@@ -100,6 +101,12 @@ async def check_ticket_availability(html_content, log_file):
     ticket_details = []
     match_layers = []
     layer_results = []
+    check_count = 0
+
+    if check_count == 0:
+        print("Checking tickets for the first time.")
+    else:
+        print(f"Page has been refreshed and checked again {check_count} time(s)")
         
     # 1. Layer 1: Result count span from UI indicator
     try:
@@ -193,6 +200,8 @@ async def check_ticket_availability(html_content, log_file):
         if ticket_details:
             f.write("Details:\n" + "\n".join(ticket_details) + "\n")
         f.write("-" * 60 + "\n")
+
+    check_count += 1
         
     return found, ticket_details
 
@@ -207,7 +216,6 @@ async def check_tickets_loop(browser, page):
             found, details = await check_ticket_availability(html, log_file)
             if found:
                 await send_email_alert(details, log_file)
-                # break  # i dont think i want this, probably stops the program once found
             else:
                 print("No tickets found.")
         except asyncio.TimeoutError:
@@ -230,6 +238,14 @@ async def shutdown(browser):
         print("Browser closed.")
     # If you want to clear user data on exit, uncomment the following line:
     # shutil.rmtree(user_data_dir, ignore_errors=True)
+
+def get_chrome_path():
+    # Return path to latest Chrome/Chromium if found, else None to use Pyppeteer's default
+    for name in ["chrome", "chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]:
+        path = shutil.which(name)
+        if path:
+            return path
+    return None
         
 # ---- Entry Point ----
 async def main():
@@ -241,10 +257,13 @@ async def main():
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
 
+    chrome_path = get_chrome_path()
+
     # Launch the browser with stealth mode
     browser = await launch({
         "headless": False,
         "userDataDir": user_data_dir, #Store cookies/session info
+        "executablePath": chrome_path,
         "args": [
                 "--start-maximized",
                 "--no-sandbox",
@@ -268,17 +287,70 @@ async def main():
 
     # Add additional stealth features
     await page.evaluateOnNewDocument("""
-    // Hide webdriver flag entirely
-    Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
-    // Set typical language preferences
-    Object.defineProperty(navigator, 'languages', { get: () => ['en-US', 'en'] });
-    // Fake a non-empty plugins array
-    Object.defineProperty(navigator, 'plugins', { get: () => [1, 2, 3, 4, 5] });
-    // Match platform to the UA string
-    Object.defineProperty(navigator, 'platform', { get: () => 'Win32' });
-    // Provide realistic hardware info
-    Object.defineProperty(navigator, 'deviceMemory', { get: () => 8 });
-    Object.defineProperty(navigator, 'hardwareConcurrency', { get: () => 4 });
+        (() => {
+        // 1. Hide the `navigator.webdriver` property to avoid Selenium/Pyppeteer detection
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => undefined,  // Return `undefined` instead of `true` (headless Chrome) or `false`
+            configurable: true     // Configurable to allow deletion or redefinition if needed
+        });
+
+        // 2. Spoof `navigator.languages` to a typical user-preferred languages array
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en']  // Example languages (US English as primary)
+        });
+
+        // 3. Spoof `navigator.platform` to a common platform value
+        Object.defineProperty(navigator, 'platform', {
+            get: () => 'Win32'  // Pretend to be on Windows 32-bit (common on Windows 10/11)
+        });
+
+        // 4. Spoof `navigator.deviceMemory` to a typical memory size in GB
+        Object.defineProperty(navigator, 'deviceMemory', {
+            get: () => 8  // e.g., 8 GB of device memory
+        });
+
+        // 5. Spoof `navigator.hardwareConcurrency` to a typical number of CPU cores
+        Object.defineProperty(navigator, 'hardwareConcurrency', {
+            get: () => 4  // e.g., 4 logical processors (common default)
+        });
+
+        // 6. Spoof `navigator.plugins` to simulate installed plugins (avoid empty plugins list)
+        if (navigator.plugins && navigator.plugins.length === 0) {
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3]  // Return a non-empty dummy array (length > 0 suffices for detection)
+            });
+        }
+
+        // 7. Canvas fingerprint spoofing: override toDataURL to return a fake image in certain cases
+        const originalToDataURL = HTMLCanvasElement.prototype.toDataURL;
+        Object.defineProperty(HTMLCanvasElement.prototype, 'toDataURL', {
+            value: function(...args) {
+                const [type, ...rest] = args;
+                // If a script is attempting the known fingerprinting canvas (e.g. 220x30px PNG), return a fake image
+                if (type === 'image/png' && this.width === 220 && this.height === 30) {
+                    // Return a consistent fake PNG data URL (here a small blank image) to spoof canvas fingerprint
+                    return 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAANwAAAAeCAIAAADIGOdpAAAAbElEQVR4nO3SMQEAIAzAMMC/5/FjgB6Jgh7dM7Og5PwOgJcpyTElOaYkx5TkmJIcU5JjSnJMSY4pyTElOaYkx5TkmJIcU5JjSnJMSY4pyTElOaYkx5TkmJIcU5JjSnJMSY4pyTElOaYkx5TkXOL+AznTluWxAAAAAElFTkSuQmCC';
+                }
+                // Otherwise, fall back to the original toDataURL method
+                return originalToDataURL.apply(this, args);
+            }
+        });
+
+        // 8. Audio fingerprint spoofing: override AudioBuffer.getChannelData to return altered data
+        const originalGetChannelData = AudioBuffer.prototype.getChannelData;
+        Object.defineProperty(AudioBuffer.prototype, 'getChannelData', {
+            value: function(...args) {
+                const originalBuffer = originalGetChannelData.apply(this, args);
+                // Create a new Float32Array with the same data to avoid modifying the original buffer
+                const newBuffer = new Float32Array(originalBuffer);
+                if (newBuffer.length > 0) {
+                    // Slightly modify the first sample in the audio data (inaudible change) to spoof the fingerprint
+                    newBuffer[0] += 0.0001;
+                }
+                return newBuffer;
+            }
+        });
+    })();
     """)
 
     await human_like_interaction(page)
