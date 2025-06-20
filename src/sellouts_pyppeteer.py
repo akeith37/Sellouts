@@ -65,12 +65,11 @@ async def send_email_alert(details, log_file):
 # ---- Function to emulate human-like interaction in the browser
 async def human_like_interaction(page):
     """
-    Simulate some realistic user interactions:
-    - Random mouse movements across the page
+    Simulate some realistic user interactions using python_ghost_cursor:
+    - Human-like mouse movements across the page
     - Scroll down then up
     - Small pauses between actions
     """
-    # Get current viewport size for bounds
     try:
         vp = page.viewport
         width, height = vp['width'], vp['height']
@@ -78,12 +77,13 @@ async def human_like_interaction(page):
         print(f"Could not get viewport size: {e}")
         return
 
-    # Random mouse movements (1–3 moves)
+    # Use python_ghost_cursor to create a human-like cursor
+    cursor = create_cursor(page)
+    # Move to a few random points on the page
     for _ in range(random.randint(1, 3)):
         x = random.randint(100, width - 100)
         y = random.randint(100, height - 100)
-        # Move in small interpolated steps
-        await page.mouse.move(x, y, steps=random.randint(10, 25))
+        await cursor.move(x, y)
         await asyncio.sleep(random.uniform(0.5, 1.5))
 
     # Simulate scrolling down
@@ -96,12 +96,11 @@ async def human_like_interaction(page):
     await asyncio.sleep(random.uniform(0.5, 1.0))
 
 # ---- Ticket availability check logic ---- 
-async def check_ticket_availability(html_content, log_file):
+async def check_ticket_availability(html_content, log_file, check_count):
     soup = BeautifulSoup(html_content, "html.parser")
     ticket_details = []
     match_layers = []
     layer_results = []
-    check_count = 0
 
     if check_count == 0:
         print("Checking tickets for the first time.")
@@ -201,19 +200,19 @@ async def check_ticket_availability(html_content, log_file):
             f.write("Details:\n" + "\n".join(ticket_details) + "\n")
         f.write("-" * 60 + "\n")
 
-    check_count += 1
-        
     return found, ticket_details
 
 # ---- Check Tickets Loop ----
 async def check_tickets_loop(browser, page):
     log_file = "sellouts_log.txt"
+    check_count = 0
     while not shutdown_event.is_set():
         try:
             await asyncio.wait_for(page.reload({'waitUntil': 'networkidle2'}), timeout=30)
             await asyncio.wait_for(page.waitForSelector("script[type='application/ld+json']"), timeout=10)
             html = await page.content()
-            found, details = await check_ticket_availability(html, log_file)
+            found, details = await check_ticket_availability(html, log_file, check_count)
+            check_count += 1
             if found:
                 await send_email_alert(details, log_file)
             else:
