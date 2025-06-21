@@ -349,7 +349,7 @@ async def main():
     })();
     """)
 
-    await human_like_interaction(page)
+    # await human_like_interaction(page)
     await page.goto(TICKET_URL, {'waitUntil': 'networkidle2'})
     await human_like_interaction(page)
     print("Check browser for CAPTCHA. Verify that you exist, wait for the next page to load, hit ENTER in the terminal to collect the HTML content")
