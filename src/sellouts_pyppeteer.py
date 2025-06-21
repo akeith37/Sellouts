@@ -274,7 +274,7 @@ async def main():
         "ignoreDefaultArgs": ["--enable-automation"],
     })
     page = (await browser.pages())[0]
-    await page.set_viewport_size({"width": 1920, "height": 1080})
+    await page.setViewport({"width": 1920, "height": 1080})
     await page.setUserAgent(
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
         'AppleWebKit/537.36 (KHTML, like Gecko) '
