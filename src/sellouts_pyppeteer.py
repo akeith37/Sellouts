@@ -14,8 +14,7 @@ from dotenv import load_dotenv
 import warnings
 import pyppeteer
 from pyppeteer import launch
-from pyppeteer_stealth import stealth
-from python_ghost_cursor.pyppeteer import create_cursor 
+from pyppeteer_stealth import stealth 
 
 
 #Suppress Pyppeteer shutdown coroutine warning
@@ -65,8 +64,8 @@ async def send_email_alert(details, log_file):
 # ---- Function to emulate human-like interaction in the browser
 async def human_like_interaction(page):
     """
-    Simulate some realistic user interactions using python_ghost_cursor:
-    - Human-like mouse movements across the page
+    Simulate some realistic user interactions:
+    - Mouse movements across the page (randomized)
     - Scroll down then up
     - Small pauses between actions
     """
@@ -77,13 +76,11 @@ async def human_like_interaction(page):
         print(f"Could not get viewport size: {e}")
         return
 
-    # Use python_ghost_cursor to create a human-like cursor
-    cursor = create_cursor(page)
-    # Move to a few random points on the page
+    # Move to a few random points on the page (simulate mouse movement)
     for _ in range(random.randint(1, 3)):
         x = random.randint(100, width - 100)
         y = random.randint(100, height - 100)
-        await cursor.move(x, y)
+        await page.mouse.move(x, y)
         await asyncio.sleep(random.uniform(0.5, 1.5))
 
     # Simulate scrolling down
