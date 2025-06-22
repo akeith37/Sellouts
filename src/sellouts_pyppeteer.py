@@ -61,37 +61,6 @@ async def send_email_alert(details, log_file):
         with open(log_file, "a") as f:
             f.write(f"[{datetime.now()}] EMAIL FAILED TO SEND: {e}\n\n")
 
-# ---- Function to emulate human-like interaction in the browser
-async def human_like_interaction(page):
-    """
-    Simulate some realistic user interactions:
-    - Mouse movements across the page (randomized)
-    - Scroll down then up
-    - Small pauses between actions
-    """
-    try:
-        vp = page.viewport
-        width, height = vp['width'], vp['height']
-    except Exception as e:
-        print(f"Could not get viewport size: {e}")
-        return
-
-    # Move to a few random points on the page (simulate mouse movement)
-    for _ in range(random.randint(1, 3)):
-        x = random.randint(100, width - 100)
-        y = random.randint(100, height - 100)
-        await page.mouse.move(x, y)
-        await asyncio.sleep(random.uniform(0.5, 1.5))
-
-    # Simulate scrolling down
-    down = random.randint(200, height - 200)
-    await page.evaluate(f"window.scrollBy(0, {down});")
-    await asyncio.sleep(random.uniform(0.5, 1.0))
-
-    # Then scroll back up half that distance
-    await page.evaluate(f"window.scrollBy(0, -{int(down/2)});")
-    await asyncio.sleep(random.uniform(0.5, 1.0))
-
 # ---- Ticket availability check logic ---- 
 async def check_ticket_availability(html_content, log_file, check_count):
     soup = BeautifulSoup(html_content, "html.parser")
