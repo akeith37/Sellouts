@@ -324,7 +324,7 @@ async def main():
     })
     print("Check browser for CAPTCHA. Verify that you exist, wait for the next page to load, hit ENTER in the terminal to collect the HTML content")
     input()
-    await page.waitForSelector("script[type='application/ld+json']")
+    # await page.waitForSelector("script[type='application/ld+json']")
 
     try:
         if page.isClosed():
@@ -335,4 +335,4 @@ async def main():
         await shutdown(browser)
         
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
+    asyncio.run(main())
