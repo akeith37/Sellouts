@@ -230,17 +230,17 @@ async def main():
         "userDataDir": user_data_dir, #Store cookies/session info
         "executablePath": chrome_path,
         "args": [
-                "--start-maximized",
+                # "--start-maximized",
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled",
-                "--disable-infobars",
+                "--disable-blink-features=AutomationControlled"
+                # "--disable-infobars",
             ],
         "ignoreDefaultArgs": ["--enable-automation"],
     })
     page = (await browser.pages())[0]
-    await page.setViewport({"width": 1920, "height": 1080})
+    # await page.setViewport({"width": 1920, "height": 1080})
     await page.setUserAgent(
         'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
         'AppleWebKit/537.36 (KHTML, like Gecko) '
