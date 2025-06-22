@@ -155,7 +155,7 @@ async def check_ticket_availability(html_content, log_file, check_count):
     except Exception as e:
         layer_results.append(f"[Layer 4] ticket-list UI: error - {e}")
         
-    # Only consider tickets found if Layer 1 passes
+    # Only consider tickets found if Layer 1 passes because its the only one I'm confident in right now
     found = "Layer 1" in match_layers
     
     with open(log_file, "a") as f:
@@ -169,7 +169,7 @@ async def check_ticket_availability(html_content, log_file, check_count):
     return found, ticket_details
 
 # ---- Check Tickets Loop ----
-async def check_tickets_loop(browser, page):
+async def check_tickets_loop(page):
     log_file = "sellouts_log.txt"
     check_count = 0
     while not shutdown_event.is_set():
@@ -230,12 +230,12 @@ async def main():
         "userDataDir": user_data_dir, #Store cookies/session info
         "executablePath": chrome_path,
         "args": [
-                # "--start-maximized",
+                "--start-maximized",
                 "--no-sandbox",
                 "--disable-setuid-sandbox",
                 "--disable-dev-shm-usage",
-                "--disable-blink-features=AutomationControlled"
-                # "--disable-infobars",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-infobars"
             ],
         "ignoreDefaultArgs": ["--enable-automation"],
     })
@@ -327,7 +327,10 @@ async def main():
     await page.waitForSelector("script[type='application/ld+json']")
 
     try:
-        await check_tickets_loop(browser, page)
+        if page.isClosed():
+            print("Page is closed, cannot proceed.")
+        else:
+            await check_tickets_loop(page)
     finally:
         await shutdown(browser)
         
