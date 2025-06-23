@@ -316,7 +316,7 @@ async def main():
 
     await page.goto(TICKET_URL, {
         'waitUntil': 'networkidle2',
-        'timeout': 60000  # Wait up to 60 seconds for the page to load
+        'timeout': 90000  # Wait up to 90 seconds for the page to load
     })
 
     try:
