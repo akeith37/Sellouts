@@ -319,6 +319,8 @@ async def main():
         'timeout': 90000  # Wait up to 90 seconds for the page to load
     })
 
+    await page.waitForSelector("script[type='application/ld+json']")
+
     try:
         await check_tickets_loop(page)
     finally:
