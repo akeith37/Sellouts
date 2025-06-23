@@ -175,7 +175,7 @@ async def check_tickets_loop(page):
     while not shutdown_event.is_set():
         try:
             print(f"Checking tickets... (check count: {check_count})")
-            await asyncio.wait_for(page.reload(timeout=60))
+            await asyncio.wait_for(page.reload)
             print("reload complete")
             await asyncio.wait_for(page.waitForSelector("script[type='application/ld+json']"), timeout=60)
             print("waitForSelector complete")
@@ -184,6 +184,7 @@ async def check_tickets_loop(page):
 
             with open("html_dump_ozzy", "a") as f:
                 f.write(html)
+                print("HTML content dumped to html_dump_ozzy")
 
             found, details = await check_ticket_availability(html, log_file, check_count)
             check_count += 1
