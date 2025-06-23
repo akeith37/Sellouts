@@ -314,15 +314,9 @@ async def main():
         'waitUntil': 'networkidle2',
         'timeout': 60000  # Wait up to 60 seconds for the page to load
     })
-    print("Check browser for CAPTCHA. Verify that you exist, wait for the next page to load, hit ENTER in the terminal to collect the HTML content")
-    input()
-    # await page.waitForSelector("script[type='application/ld+json']")
 
     try:
-        if page.isClosed():
-            print("Page is closed, cannot proceed.")
-        else:
-            await check_tickets_loop(page)
+        await check_tickets_loop(page)
     finally:
         await shutdown(browser)
         
@@ -331,5 +325,4 @@ if __name__ == "__main__":
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt received. Exiting gracefully.")
-        # Optionally, set shutdown_event if you want to trigger shutdown logic
-        # shutdown_event.set()
+        shutdown_event.set()
