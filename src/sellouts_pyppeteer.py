@@ -28,7 +28,9 @@ EMAIL_ADDRESS=os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD=os.getenv("EMAIL_PASSWORD")
 RECIPIENT_EMAIL=os.getenv("RECIPIENT_EMAIL")
 CHECK_INTERVAL=60 #seconds between checking again
-TICKET_URL="https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
+ozzy_url="https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
+lzzy_url="https://www.ticketmaster.co.uk/halestorm-glasgow-21-11-2025/event/3600628EEF705D6B"
+TICKET_URL= lzzy_url
 
 # Check for required environment variables
 required_env_vars = [EMAIL_ADDRESS, EMAIL_PASSWORD, RECIPIENT_EMAIL]
@@ -182,9 +184,9 @@ async def check_tickets_loop(page):
             html = await page.content()
             print("Page content retrieved successfully.")
 
-            with open("html_dump_ozzy", "a") as f:
+            with open("html_dump_lzzy", "a") as f:
                 f.write(html)
-                print("HTML content dumped to html_dump_ozzy")
+                print("HTML content dumped to html_dump_lzzy")
 
             found, details = await check_ticket_availability(html, log_file, check_count)
             check_count += 1
