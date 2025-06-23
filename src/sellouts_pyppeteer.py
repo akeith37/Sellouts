@@ -29,7 +29,7 @@ EMAIL_PASSWORD=os.getenv("EMAIL_PASSWORD")
 RECIPIENT_EMAIL=os.getenv("RECIPIENT_EMAIL")
 CHECK_INTERVAL=60 #seconds between checking again
 ozzy_url="https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
-lzzy_url="https://www.ticketmaster.co.uk/halestorm-glasgow-21-11-2025/event/3600628EEF705D6B"
+lzzy_url="https://www.ticketmaster.co.uk/halestorm-the-neverest-tour-cardiff-20-11-2025/event/360062978E2B0C80"
 TICKET_URL= lzzy_url
 
 # Check for required environment variables
