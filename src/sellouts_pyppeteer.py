@@ -328,10 +328,10 @@ async def main():
     await page.waitForSelector("script[type='application/ld+json']")
     print("JSON-LD script found, starting ticket checks...")
 
-    try:
-        await check_tickets_loop(page)
-    finally:
-        await shutdown(browser)
+    # try:
+    await check_tickets_loop(page)
+    # finally:
+    #     await shutdown(browser)
         
 if __name__ == "__main__":
     try:
