@@ -175,8 +175,8 @@ async def check_tickets_loop(page):
     while not shutdown_event.is_set():
         try:
             print(f"Checking tickets... (check count: {check_count})")
-            await asyncio.wait_for(page.reload({'waitUntil': 'networkidle2'}), timeout=60)
-            print("networkidle2 reload complete")
+            await asyncio.wait_for(page.reload(timeout=60))
+            print("reload complete")
             await asyncio.wait_for(page.waitForSelector("script[type='application/ld+json']"), timeout=60)
             print("waitForSelector complete")
             html = await page.content()
