@@ -199,10 +199,10 @@ async def check_tickets_loop(page):
             print("Unexpected error:", e)
             traceback.print_exc()
         print(f"Waiting {CHECK_INTERVAL} seconds...\n")
-    try:
+        # try:
         await asyncio.wait_for(shutdown_event.wait(), timeout=CHECK_INTERVAL)
-    except asyncio.TimeoutError:
-        pass
+        # except asyncio.TimeoutError:
+        #     continue
         
 # ---- Shutdown and Cleanup ----
 async def shutdown(browser):
