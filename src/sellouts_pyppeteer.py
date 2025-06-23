@@ -203,7 +203,6 @@ async def check_tickets_loop(page):
         await asyncio.wait_for(shutdown_event.wait(), timeout=CHECK_INTERVAL)
     except asyncio.TimeoutError:
         pass
-    print("Exiting check_tickets_loop: shutdown_event.is_set() =", shutdown_event.is_set())
         
 # ---- Shutdown and Cleanup ----
 async def shutdown(browser):
