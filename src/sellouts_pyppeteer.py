@@ -214,14 +214,6 @@ def get_chrome_path():
         
 # ---- Entry Point ----
 async def main():
-    # Set up signal handlers for graceful shutdown
-    def handle_signal(sig, frame):
-        print(f"Signal {sig} received. Shutdown requested...")
-        shutdown_event.set()
-        
-    signal.signal(signal.SIGINT, handle_signal)
-    signal.signal(signal.SIGTERM, handle_signal)
-
     chrome_path = get_chrome_path()
 
     # Launch the browser with stealth mode
@@ -335,4 +327,9 @@ async def main():
         await shutdown(browser)
         
 if __name__ == "__main__":
-    asyncio.get_event_loop().run_until_complete(main())
+    try:
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("\nKeyboardInterrupt received. Exiting gracefully.")
+        # Optionally, set shutdown_event if you want to trigger shutdown logic
+        # shutdown_event.set()
