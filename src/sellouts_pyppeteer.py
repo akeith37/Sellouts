@@ -317,12 +317,16 @@ async def main():
     })();
     """)
 
+    print("about to go to page")
+
     await page.goto(TICKET_URL, {
         'waitUntil': 'networkidle2',
         'timeout': 90000  # Wait up to 90 seconds for the page to load
     })
+    print("Page loaded, waiting for JSON-LD script...") 
 
     await page.waitForSelector("script[type='application/ld+json']")
+    print("JSON-LD script found, starting ticket checks...")
 
     try:
         await check_tickets_loop(page)
