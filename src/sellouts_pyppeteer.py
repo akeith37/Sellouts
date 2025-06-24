@@ -98,10 +98,10 @@ async def check_ticket_availability(html_content, log_file, check_count):
     try:
         banner = soup.find('span', {'data-testid': 'message-bar-text'})
         if banner and "no tickets currently available" in banner.get_text(strip=True).lower():
-            layer_results.append("[Layer 2] sold-out banner: MATCH -> NO TICKETS")
+            layer_results.append("[Layer 2] sold-out banner exists: NO TICKETS")
         else:
-            layer_results.append("[Layer 2] sold-out banner: no match")
-            match_layers.append("Layer 2 (no sold-out text)")
+            layer_results.append("[Layer 2] no sold-out banner: MATCH")
+            match_layers.append("Layer 2")
     except Exception as e:
         layer_results.append(f"[Layer 2] sold-out banner: error - {e}")
             
