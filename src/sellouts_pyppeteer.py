@@ -70,10 +70,6 @@ async def check_ticket_availability(html_content, log_file, check_count):
     match_layers = []
     layer_results = []
 
-    with open("html_dump_lzzy_soup", "a") as f:
-        f.write(soup)
-        print("HTML content dumped to html_dump_lzzy_soup")
-
     if check_count == 0:
         print("Checking tickets for the first time.")
     else:
@@ -187,6 +183,12 @@ async def check_tickets_loop(page):
             print("waitForSelector complete")
             html = await page.content()
             print("Page content retrieved successfully.")
+
+            with open("html_dump_lzzy", "a") as f:
+                f.write(html)
+                print("HTML content dumped to html_dump_lzzy")
+
+
             found, details = await check_ticket_availability(html, log_file, check_count)
             check_count += 1
             if found:
