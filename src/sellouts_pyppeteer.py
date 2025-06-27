@@ -60,125 +60,133 @@ async def send_email_alert(details, log_file):
             f.write(f"[{datetime.now()}] EMAIL SENT \n{body}\n\n")
     except Exception as e:
         print("Failed to send email:", e)
+        import traceback
+        traceback.print_exc()
         with open(log_file, "a") as f:
             f.write(f"[{datetime.now()}] EMAIL FAILED TO SEND: {e}\n\n")
 
 # ---- Ticket availability check logic ---- 
 async def check_ticket_availability(html_content, log_file, check_count):
-    soup = BeautifulSoup(html_content, "html.parser")
-    ticket_details = []
-    match_layers = []
-    layer_results = []
+    try:
+        soup = BeautifulSoup(html_content, "html.parser")
+        ticket_details = []
+        match_layers = []
+        layer_results = []
 
-    if check_count == 0:
-        print("Checking tickets for the first time.")
-    else:
-        print(f"Page has been refreshed and checked again {check_count} time(s)")
-        
-    # 1. Layer 1: Result count span from UI indicator
-    try:
-        print("Start layer 1 check: resultCount span")
-        result_span = soup.find('span', class_=lambda c: c and 'resultCount' in c)
-        if result_span:
-            text = result_span.get_text(strip=True).lower()
-            if text.startswith("0 no results"):
-                layer_results.append("[Layer 1] resultCount: 0 no results -> NO TICKETS.")
-            elif  "result" in text and "no" not in text:
-                layer_results.append(f"[Layer 1] resultCount: '{text}' -> MATCH")
-                match_layers.append("Layer 1")
+        if check_count == 0:
+            print("Checking tickets for the first time.")
         else:
-            layer_results.append("[Layer 1] resultCount: span not found")
-    except Exception as e:
-        layer_results.append(f"[Layer 1] resultCount: error - {e}")
-    print("Layer 1 check complete.")
+            print(f"Page has been refreshed and checked again {check_count} time(s)")
             
-    # Layer 2: Sold-Out Banner
-    try:
-        print("Start layer 2 check: sold-out banner")
-        banner = soup.find('span', {'data-testid': 'message-bar-text'})
-        if banner and "no tickets currently available" in banner.get_text(strip=True).lower():
-            layer_results.append("[Layer 2] sold-out banner exists: NO TICKETS")
-        else:
-            layer_results.append("[Layer 2] no sold-out banner: MATCH")
-            match_layers.append("Layer 2")
-    except Exception as e:
-        layer_results.append(f"[Layer 2] sold-out banner: error - {e}")
-    print("Layer 2 check complete.")
+        # 1. Layer 1: Result count span from UI indicator
+        try:
+            print("Start layer 1 check: resultCount span")
+            result_span = soup.find('span', class_=lambda c: c and 'resultCount' in c)
+            if result_span:
+                text = result_span.get_text(strip=True).lower()
+                if text.startswith("0 no results"):
+                    layer_results.append("[Layer 1] resultCount: 0 no results -> NO TICKETS.")
+                elif  "result" in text and "no" not in text:
+                    layer_results.append(f"[Layer 1] resultCount: '{text}' -> MATCH")
+                    match_layers.append("Layer 1")
+            else:
+                layer_results.append("[Layer 1] resultCount: span not found")
+        except Exception as e:
+            layer_results.append(f"[Layer 1] resultCount: error - {e}")
+        print("Layer 1 check complete.")
             
-    # Layer 3: JSON-LD ticket offer
-    try:
-        print("Start layer 3 check: JSON-LD ticket offers")
-        scripts = soup.find_all("script", type="application/ld+json")
-        found_in_json = False
-        for script in scripts:
-            try:
-                if not script.string:
-                    continue
-                data = json.loads(script.string.strip())
-                entries = data if isinstance(data, list) else [data]
-                for entry in entries:
-                    if entry.get("@type") != "MusicEvent":
+        # Layer 2: Sold-Out Banner
+        try:
+            print("Start layer 2 check: sold-out banner")
+            banner = soup.find('span', {'data-testid': 'message-bar-text'})
+            if banner and "no tickets currently available" in banner.get_text(strip=True).lower():
+                layer_results.append("[Layer 2] sold-out banner exists: NO TICKETS")
+            else:
+                layer_results.append("[Layer 2] no sold-out banner: MATCH")
+                match_layers.append("Layer 2")
+        except Exception as e:
+            layer_results.append(f"[Layer 2] sold-out banner: error - {e}")
+        print("Layer 2 check complete.")
+            
+        # Layer 3: JSON-LD ticket offer
+        try:
+            print("Start layer 3 check: JSON-LD ticket offers")
+            scripts = soup.find_all("script", type="application/ld+json")
+            found_in_json = False
+            for script in scripts:
+                try:
+                    if not script.string:
                         continue
-                    offers = entry.get("offers")
-                    if not offers:
-                        continue
-                    offers = offers if isinstance(offers, list) else [offers]
-                    for offer in offers:
-                        if not isinstance(offer, dict):
+                    data = json.loads(script.string.strip())
+                    entries = data if isinstance(data, list) else [data]
+                    for entry in entries:
+                        if entry.get("@type") != "MusicEvent":
                             continue
-                        availability = offer.get("availability")
-                        url = offer.get("url")
-                        price = offer.get("price")
-                        currency = offer.get("priceCurrency")
-                        location = offer.get("name") or offer.get("category") or offer.get("description")
-                        if (
-                            availability == "http://schema.org/InStock"
-                            and isinstance(url, str)
-                            and "ticketmaster.co.uk" in url.lower()
-                            and "event" in url.lower()
-                            and price
-                        ):
-                            detail = f"- Price: {price or 'Unavailable'} {currency or ''} | Location: {location or 'N/A'}"
-                            ticket_details.append(detail)
-                            found_in_json = True
-            except Exception as e:
-                continue
-        if found_in_json:
-            match_layers.append("Layer 3")
-            layer_results.append("[Layer 3] JSON-LD: MATCH")
-        else:
-            layer_results.append("[Layer 3] JSON-LD: no matching offers")
-    except Exception as e:
-        layer_results.append(f"[Layer 3] JSON-LD: error - {e}")
-    print("Layer 3 check complete.")
-    
-    # Layer 4: ticket-list UI block
-    try:
-        print("Start layer 4 check: ticket-list UI block")
-        ticket_list = soup.find(attrs={"data-testid": "ticket-list"})
-        if ticket_list:
-            match_layers.append("Layer 4")
-            layer_results.append("[Layer 4] ticket-list UI: MATCH")
-        else:
-            layer_results.append("[Layer 4] ticket-list UI: not found")
-    except Exception as e:
-        layer_results.append(f"[Layer 4] ticket-list UI: error - {e}")
-    print("Layer 4 check complete.")
+                        offers = entry.get("offers")
+                        if not offers:
+                            continue
+                        offers = offers if isinstance(offers, list) else [offers]
+                        for offer in offers:
+                            if not isinstance(offer, dict):
+                                continue
+                            availability = offer.get("availability")
+                            url = offer.get("url")
+                            price = offer.get("price")
+                            currency = offer.get("priceCurrency")
+                            location = offer.get("name") or offer.get("category") or offer.get("description")
+                            if (
+                                availability == "http://schema.org/InStock"
+                                and isinstance(url, str)
+                                and "ticketmaster.co.uk" in url.lower()
+                                and "event" in url.lower()
+                                and price
+                            ):
+                                detail = f"- Price: {price or 'Unavailable'} {currency or ''} | Location: {location or 'N/A'}"
+                                ticket_details.append(detail)
+                                found_in_json = True
+                except Exception as e:
+                    continue
+            if found_in_json:
+                match_layers.append("Layer 3")
+                layer_results.append("[Layer 3] JSON-LD: MATCH")
+            else:
+                layer_results.append("[Layer 3] JSON-LD: no matching offers")
+        except Exception as e:
+            layer_results.append(f"[Layer 3] JSON-LD: error - {e}")
+        print("Layer 3 check complete.")
         
-    # Only consider tickets found if Layer 1 passes because its the only one I'm confident in right now
-    found = "Layer 1" in match_layers
-    
-    with open(log_file, "a") as f:
-        print("Writing results to log file...")
-        f.write(f"[{datetime.now()}] CHECK RESULT: {'FOUND' if found else 'NONE'}\n")
-        for line in layer_results:
-            f.write(line + "\n")
-        if ticket_details:
-            f.write("Details:\n" + "\n".join(ticket_details) + "\n")
-        f.write("-" * 60 + "\n")
-    print("Results written to log file.")
+        # Layer 4: ticket-list UI block
+        try:
+            print("Start layer 4 check: ticket-list UI block")
+            ticket_list = soup.find(attrs={"data-testid": "ticket-list"})
+            if ticket_list:
+                match_layers.append("Layer 4")
+                layer_results.append("[Layer 4] ticket-list UI: MATCH")
+            else:
+                layer_results.append("[Layer 4] ticket-list UI: not found")
+        except Exception as e:
+            layer_results.append(f"[Layer 4] ticket-list UI: error - {e}")
+        print("Layer 4 check complete.")
+            
+        # Only consider tickets found if Layer 1 passes because its the only one I'm confident in right now
+        found = "Layer 1" in match_layers
+        
+        with open(log_file, "a") as f:
+            print("Writing results to log file...")
+            f.write(f"[{datetime.now()}] CHECK RESULT: {'FOUND' if found else 'NONE'}\n")
+            for line in layer_results:
+                f.write(line + "\n")
+            if ticket_details:
+                f.write("Details:\n" + "\n".join(ticket_details) + "\n")
+            f.write("-" * 60 + "\n")
+        print("Results written to log file.")
 
-    return found, ticket_details
+        return found, ticket_details
+    except Exception as e:
+        print("Error in check_ticket_availability:", e)
+        import traceback
+        traceback.print_exc()
+        return False, []
 
 # ---- Check Tickets Loop ----
 async def check_tickets_loop(page):
@@ -193,12 +201,14 @@ async def check_tickets_loop(page):
             print("waitForSelector complete")
             html = await page.content()
             print("Page content retrieved successfully.")
-
-            with open("html_dump_lzzy", "a") as f:
-                f.write(html.text)
-                print("HTML content dumped to html_dump_lzzy")
-
-
+            try:
+                with open("html_dump_lzzy", "a") as f:
+                    f.write(html)
+                    print("HTML content dumped to html_dump_lzzy")
+            except Exception as e:
+                print("Failed to write HTML dump:", e)
+                import traceback
+                traceback.print_exc()
             found, details = await check_ticket_availability(html, log_file, check_count)
             check_count += 1
             if found:
@@ -212,19 +222,26 @@ async def check_tickets_loop(page):
                 pass  # Normal, just continue loop
         except asyncio.TimeoutError:
             print("Timeout occurred while waiting for page reload, selector, or interval.")
+            import traceback
+            traceback.print_exc()
             continue
         except Exception as e:
+            print("Unexpected error in check_tickets_loop:", e)
             import traceback
-            print("Unexpected error:", e)
             traceback.print_exc()
             continue
 
 # ---- Shutdown and Cleanup ----
 async def shutdown(browser):
     print("Shutting down...")
-    if browser:
-        await browser.close()
-        print("Browser closed.")
+    try:
+        if browser:
+            await browser.close()
+            print("Browser closed.")
+    except Exception as e:
+        print("Error during browser shutdown:", e)
+        import traceback
+        traceback.print_exc()
     # If you want to clear user data on exit, uncomment the following line:
     # shutil.rmtree(user_data_dir, ignore_errors=True)
 
@@ -335,8 +352,8 @@ async def main():
         await page.waitForSelector("script[type='application/ld+json']")
         await check_tickets_loop(page)
     except Exception as e:
-        import traceback
         print("Fatal error in main():", e)
+        import traceback
         traceback.print_exc()
     finally:
         await shutdown(browser)
@@ -347,3 +364,7 @@ if __name__ == "__main__":
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt received. Exiting gracefully.")
         shutdown_event.set()
+    except Exception as e:
+        print("Fatal error in __main__:", e)
+        import traceback
+        traceback.print_exc()
