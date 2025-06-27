@@ -188,49 +188,6 @@ async def check_ticket_availability(html_content, log_file, check_count):
         traceback.print_exc()
         return False, []
 
-# ---- Check Tickets Loop ----
-async def check_tickets_loop(page):
-    log_file = "sellouts_log.txt"
-    check_count = 0
-    while not shutdown_event.is_set():
-        try:
-            print(f"Checking tickets... (check count: {check_count})")
-            await asyncio.wait_for(page.reload({'waitUntil': 'networkidle2'}), timeout=60)
-            print("reload complete")
-            await asyncio.wait_for(page.waitForSelector("script[type='application/ld+json']"), timeout=60)
-            print("waitForSelector complete")
-            html = await page.content()
-            print("Page content retrieved successfully.")
-            try:
-                with open("html_dump_ozzy", "a") as f:
-                    f.write(html)
-                    print("HTML content dumped to html_dump_ozzy")
-            except Exception as e:
-                print("Failed to write HTML dump:", e)
-                import traceback
-                traceback.print_exc()
-            found, details = await check_ticket_availability(html, log_file, check_count)
-            check_count += 1
-            if found:
-                await send_email_alert(details, log_file)
-            else:
-                print("No tickets found.")
-            print(f"Waiting {CHECK_INTERVAL} seconds...\n")
-            try:
-                await asyncio.wait_for(shutdown_event.wait(), timeout=CHECK_INTERVAL)
-            except asyncio.TimeoutError:
-                pass  # Normal, just continue loop
-        except asyncio.TimeoutError:
-            print("Timeout occurred while waiting for page reload, selector, or interval.")
-            import traceback
-            traceback.print_exc()
-            continue
-        except Exception as e:
-            print("Unexpected error in check_tickets_loop:", e)
-            import traceback
-            traceback.print_exc()
-            continue
-
 # ---- Shutdown and Cleanup ----
 async def shutdown(browser):
     print("Shutting down...")
@@ -257,6 +214,7 @@ def get_chrome_path():
 async def main():
     chrome_path = get_chrome_path()
     browser = None
+    shutdown_event = asyncio.Event()  # Create inside main
     try:
         browser = await launch({
             "headless": False,
@@ -350,20 +308,63 @@ async def main():
             'timeout': 90000  # Wait up to 90 seconds for the page to load
         })
         await page.waitForSelector("script[type='application/ld+json']")
-        await check_tickets_loop(page)
+        await check_tickets_loop(page, shutdown_event)
     except Exception as e:
         print("Fatal error in main():", e)
         import traceback
         traceback.print_exc()
     finally:
         await shutdown(browser)
-        
+
+# ---- Check Tickets Loop ----
+async def check_tickets_loop(page, shutdown_event):
+    log_file = "sellouts_log.txt"
+    check_count = 0
+    while not shutdown_event.is_set():
+        try:
+            print(f"Checking tickets... (check count: {check_count})")
+            await asyncio.wait_for(page.reload({'waitUntil': 'networkidle2'}), timeout=60)
+            print("reload complete")
+            await asyncio.wait_for(page.waitForSelector("script[type='application/ld+json']"), timeout=60)
+            print("waitForSelector complete")
+            html = await page.content()
+            print("Page content retrieved successfully.")
+            try:
+                with open("html_dump_ozzy", "a") as f:
+                    f.write(html)
+                    print("HTML content dumped to html_dump_ozzy")
+            except Exception as e:
+                print("Failed to write HTML dump:", e)
+                import traceback
+                traceback.print_exc()
+            found, details = await check_ticket_availability(html, log_file, check_count)
+            check_count += 1
+            if found:
+                await send_email_alert(details, log_file)
+            else:
+                print("No tickets found.")
+            print(f"Waiting {CHECK_INTERVAL} seconds...\n")
+            try:
+                await asyncio.wait_for(shutdown_event.wait(), timeout=CHECK_INTERVAL)
+            except asyncio.TimeoutError:
+                pass  # Normal, just continue loop
+        except asyncio.TimeoutError:
+            print("Timeout occurred while waiting for page reload, selector, or interval.")
+            import traceback
+            traceback.print_exc()
+            continue
+        except Exception as e:
+            print("Unexpected error in check_tickets_loop:", e)
+            import traceback
+            traceback.print_exc()
+            continue
+
 if __name__ == "__main__":
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\nKeyboardInterrupt received. Exiting gracefully.")
-        shutdown_event.set()
+        # No shutdown_event.set() here, as it's now local to main
     except Exception as e:
         print("Fatal error in __main__:", e)
         import traceback
