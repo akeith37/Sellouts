@@ -77,6 +77,7 @@ async def check_ticket_availability(html_content, log_file, check_count):
         
     # 1. Layer 1: Result count span from UI indicator
     try:
+        print("Start layer 1 check: resultCount span")
         result_span = soup.find('span', class_=lambda c: c and 'resultCount' in c)
         if result_span:
             text = result_span.get_text(strip=True).lower()
@@ -89,9 +90,11 @@ async def check_ticket_availability(html_content, log_file, check_count):
             layer_results.append("[Layer 1] resultCount: span not found")
     except Exception as e:
         layer_results.append(f"[Layer 1] resultCount: error - {e}")
+    print("Layer 1 check complete.")
             
     # Layer 2: Sold-Out Banner
     try:
+        print("Start layer 2 check: sold-out banner")
         banner = soup.find('span', {'data-testid': 'message-bar-text'})
         if banner and "no tickets currently available" in banner.get_text(strip=True).lower():
             layer_results.append("[Layer 2] sold-out banner exists: NO TICKETS")
@@ -100,9 +103,11 @@ async def check_ticket_availability(html_content, log_file, check_count):
             match_layers.append("Layer 2")
     except Exception as e:
         layer_results.append(f"[Layer 2] sold-out banner: error - {e}")
+    print("Layer 2 check complete.")
             
     # Layer 3: JSON-LD ticket offer
     try:
+        print("Start layer 3 check: JSON-LD ticket offers")
         scripts = soup.find_all("script", type="application/ld+json")
         found_in_json = False
         for script in scripts:
@@ -145,9 +150,11 @@ async def check_ticket_availability(html_content, log_file, check_count):
             layer_results.append("[Layer 3] JSON-LD: no matching offers")
     except Exception as e:
         layer_results.append(f"[Layer 3] JSON-LD: error - {e}")
+    print("Layer 3 check complete.")
     
     # Layer 4: ticket-list UI block
     try:
+        print("Start layer 4 check: ticket-list UI block")
         ticket_list = soup.find(attrs={"data-testid": "ticket-list"})
         if ticket_list:
             match_layers.append("Layer 4")
@@ -156,17 +163,20 @@ async def check_ticket_availability(html_content, log_file, check_count):
             layer_results.append("[Layer 4] ticket-list UI: not found")
     except Exception as e:
         layer_results.append(f"[Layer 4] ticket-list UI: error - {e}")
+    print("Layer 4 check complete.")
         
     # Only consider tickets found if Layer 1 passes because its the only one I'm confident in right now
     found = "Layer 1" in match_layers
     
     with open(log_file, "a") as f:
+        print("Writing results to log file...")
         f.write(f"[{datetime.now()}] CHECK RESULT: {'FOUND' if found else 'NONE'}\n")
         for line in layer_results:
             f.write(line + "\n")
         if ticket_details:
             f.write("Details:\n" + "\n".join(ticket_details) + "\n")
         f.write("-" * 60 + "\n")
+    print("Results written to log file.")
 
     return found, ticket_details
 
@@ -185,7 +195,7 @@ async def check_tickets_loop(page):
             print("Page content retrieved successfully.")
 
             with open("html_dump_lzzy", "a") as f:
-                f.write(html)
+                f.write(html.text)
                 print("HTML content dumped to html_dump_lzzy")
 
 
