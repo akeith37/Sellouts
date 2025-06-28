@@ -78,62 +78,69 @@ async def check_ticket_availability(html_content, log_file, check_count):
         else:
             print(f"Page has been refreshed and checked again {check_count} time(s)")
             
-        # --- New Layer: VisuallyHidden result span (multiple occurrences) ---
+        # --- Layer 1: VisuallyHidden result span (multiple occurrences) ---
         try:
-            print("Start new layer: VisuallyHidden result span (all occurrences)")
+            print("Start Layer 1: VisuallyHidden result span (all occurrences)")
             vh_spans = soup.find_all('span', {'role': 'status', 'class': lambda c: c and 'VisuallyHidden' in c})
             if vh_spans:
-                found_nonzero = False
+                vh_found = False
                 for idx, vh_span in enumerate(vh_spans):
                     vh_text = vh_span.get_text(strip=True)
-                    layer_results.append(f"[Layer VH] VisuallyHidden span #{idx+1}: '{vh_text}'")
-                    if not vh_text.lower().startswith("0 no results"):
-                        found_nonzero = True
-                if found_nonzero:
-                    match_layers.append("Layer VH")
-                else:
-                    layer_results.append("[Layer VH] All VisuallyHidden spans indicate 0 no results -> NO TICKETS.")
+                    if vh_text.lower().startswith("0 no results"):
+                        layer_results.append(f"[Layer 1: VisuallyHidden] NO TICKETS (span #{idx+1}, text: '{vh_text}')")
+                    else:
+                        layer_results.append(f"[Layer 1: VisuallyHidden] TICKETS POSSIBLY AVAILABLE (span #{idx+1}, text: '{vh_text}')")
+                        vh_found = True
+                if vh_found:
+                    match_layers.append("Layer 1: VisuallyHidden")
             else:
-                layer_results.append("[Layer VH] VisuallyHidden span not found")
+                layer_results.append("[Layer 1: VisuallyHidden] No VisuallyHidden span found")
         except Exception as e:
-            layer_results.append(f"[Layer VH] VisuallyHidden span: error - {e}")
-        print("New layer (VisuallyHidden) check complete.")
+            layer_results.append(f"[Layer 1: VisuallyHidden] ERROR: {e}")
+        print("Layer 1 (VisuallyHidden) check complete.")
 
-        # 1. Layer 1: Result count span from UI indicator
+        # --- Layer 2: Result count span from UI indicator ---
         try:
-            print("Start layer 1 check: resultCount span")
+            print("Start Layer 2: resultCount span")
             result_span = soup.find('span', class_=lambda c: c and 'resultCount' in c)
             if result_span:
                 text = result_span.get_text(strip=True).lower()
                 if text.startswith("0 no results"):
-                    layer_results.append("[Layer 1] resultCount: 0 no results -> NO TICKETS.")
-                elif  "result" in text and "no" not in text:
-                    layer_results.append(f"[Layer 1] resultCount: '{text}' -> MATCH")
-                    match_layers.append("Layer 1")
+                    layer_results.append(f"[Layer 2: resultCount] NO TICKETS (text: '{text}')")
+                elif "result" in text and "no" not in text:
+                    layer_results.append(f"[Layer 2: resultCount] TICKETS POSSIBLY AVAILABLE (text: '{text}')")
+                    match_layers.append("Layer 2: resultCount")
+                else:
+                    layer_results.append(f"[Layer 2: resultCount] UNRECOGNIZED RESULT (text: '{text}')")
             else:
-                layer_results.append("[Layer 1] resultCount: span not found")
+                layer_results.append("[Layer 2: resultCount] No resultCount span found")
         except Exception as e:
-            layer_results.append(f"[Layer 1] resultCount: error - {e}")
-        print("Layer 1 check complete.")
-            
-        # Layer 2: Sold-Out Banner
+            layer_results.append(f"[Layer 2: resultCount] ERROR: {e}")
+        print("Layer 2 (resultCount) check complete.")
+
+        # --- Layer 3: Sold-Out Banner ---
         try:
-            print("Start layer 2 check: sold-out banner")
+            print("Start Layer 3: sold-out banner")
             banner = soup.find('span', {'data-testid': 'message-bar-text'})
-            if banner and "no tickets currently available" in banner.get_text(strip=True).lower():
-                layer_results.append("[Layer 2] sold-out banner exists: NO TICKETS")
+            if banner:
+                banner_text = banner.get_text(strip=True).lower()
+                if "no tickets currently available" in banner_text:
+                    layer_results.append(f"[Layer 3: sold-out banner] NO TICKETS (text: '{banner_text}')")
+                else:
+                    layer_results.append(f"[Layer 3: sold-out banner] TICKETS POSSIBLY AVAILABLE (text: '{banner_text}')")
+                    match_layers.append("Layer 3: sold-out banner")
             else:
-                layer_results.append("[Layer 2] no sold-out banner: MATCH")
-                match_layers.append("Layer 2")
+                layer_results.append("[Layer 3: sold-out banner] No sold-out banner found")
         except Exception as e:
-            layer_results.append(f"[Layer 2] sold-out banner: error - {e}")
-        print("Layer 2 check complete.")
-            
-        # Layer 3: JSON-LD ticket offer
+            layer_results.append(f"[Layer 3: sold-out banner] ERROR: {e}")
+        print("Layer 3 (sold-out banner) check complete.")
+
+        # --- Layer 4: JSON-LD ticket offer ---
         try:
-            print("Start layer 3 check: JSON-LD ticket offers")
+            print("Start Layer 4: JSON-LD ticket offers")
             scripts = soup.find_all("script", type="application/ld+json")
             found_in_json = False
+            jsonld_details = []
             for script in scripts:
                 try:
                     if not script.string:
@@ -143,6 +150,12 @@ async def check_ticket_availability(html_content, log_file, check_count):
                     for entry in entries:
                         if entry.get("@type") != "MusicEvent":
                             continue
+                        # Extract event info
+                        event_name = entry.get("name")
+                        event_date = entry.get("startDate")
+                        venue = entry.get("location", {}).get("name")
+                        address = entry.get("location", {}).get("address", {}).get("streetAddress")
+                        city = entry.get("location", {}).get("address", {}).get("addressLocality")
                         offers = entry.get("offers")
                         if not offers:
                             continue
@@ -154,43 +167,41 @@ async def check_ticket_availability(html_content, log_file, check_count):
                             url = offer.get("url")
                             price = offer.get("price")
                             currency = offer.get("priceCurrency")
-                            location = offer.get("name") or offer.get("category") or offer.get("description")
-                            if (
-                                availability == "http://schema.org/InStock"
-                                and isinstance(url, str)
-                                and "ticketmaster.co.uk" in url.lower()
-                                and "event" in url.lower()
-                                and price
-                            ):
-                                detail = f"- Price: {price or 'Unavailable'} {currency or ''} | Location: {location or 'N/A'}"
-                                ticket_details.append(detail)
+                            description = offer.get("description")
+                            # Compose details string
+                            details_str = f"Event: {event_name} | Date: {event_date} | Venue: {venue}, {address}, {city} | "
+                            details_str += f"Availability: {availability} | URL: {url} | Price: {price or 'N/A'} {currency or ''} | Description: {description or 'N/A'}"
+                            jsonld_details.append(details_str)
+                            if availability == "http://schema.org/InStock":
                                 found_in_json = True
                 except Exception as e:
                     continue
             if found_in_json:
-                match_layers.append("Layer 3")
-                layer_results.append("[Layer 3] JSON-LD: MATCH")
+                layer_results.append("[Layer 4: JSON-LD] TICKETS POSSIBLY AVAILABLE (InStock offer found)")
+                match_layers.append("Layer 4: JSON-LD")
+                if jsonld_details:
+                    layer_results.extend([f"[Layer 4: JSON-LD] {d}" for d in jsonld_details])
             else:
-                layer_results.append("[Layer 3] JSON-LD: no matching offers")
+                layer_results.append("[Layer 4: JSON-LD] NO TICKETS (no matching offers)")
         except Exception as e:
-            layer_results.append(f"[Layer 3] JSON-LD: error - {e}")
-        print("Layer 3 check complete.")
-        
-        # Layer 4: ticket-list UI block
+            layer_results.append(f"[Layer 4: JSON-LD] ERROR: {e}")
+        print("Layer 4 (JSON-LD) check complete.")
+
+        # --- Layer 5: ticket-list UI block ---
         try:
-            print("Start layer 4 check: ticket-list UI block")
+            print("Start Layer 5: ticket-list UI block")
             ticket_list = soup.find(attrs={"data-testid": "ticket-list"})
             if ticket_list:
-                match_layers.append("Layer 4")
-                layer_results.append("[Layer 4] ticket-list UI: MATCH")
+                layer_results.append("[Layer 5: ticket-list UI] TICKETS POSSIBLY AVAILABLE (ticket-list UI found)")
+                match_layers.append("Layer 5: ticket-list UI")
             else:
-                layer_results.append("[Layer 4] ticket-list UI: not found")
+                layer_results.append("[Layer 5: ticket-list UI] NO TICKETS (ticket-list UI not found)")
         except Exception as e:
-            layer_results.append(f"[Layer 4] ticket-list UI: error - {e}")
-        print("Layer 4 check complete.")
-            
-        # Only consider tickets found if Layer 1 passes because its the only one I'm confident in right now
-        found = "Layer 1" in match_layers or "Layer VH" in match_layers
+            layer_results.append(f"[Layer 5: ticket-list UI] ERROR: {e}")
+        print("Layer 5 (ticket-list UI) check complete.")
+        
+        # Only consider tickets found if Layer 1 (VisuallyHidden) passes because its the only one I'm confident in right now - confirmed for Ozzy and Lzzy
+        found = "Layer 1: VisuallyHidden" in match_layers
         
         with open(log_file, "a") as f:
             print("Writing results to log file...")
