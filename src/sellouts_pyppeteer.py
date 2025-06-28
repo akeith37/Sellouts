@@ -361,14 +361,14 @@ async def check_tickets_loop(page, shutdown_event):
             print("waitForSelector complete")
             html = await page.content()
             print("Page content retrieved successfully.")
-            try:
-                with open("html_dump_ozzy", "a") as f:
-                    f.write(html)
-                    print("HTML content dumped to html_dump_ozzy")
-            except Exception as e:
-                print("Failed to write HTML dump:", e)
-                import traceback
-                traceback.print_exc()
+            # try:
+            #     with open("html_dump_ozzy", "a") as f:
+            #         f.write(html)
+            #         print("HTML content dumped to html_dump_ozzy")
+            # except Exception as e:
+            #     print("Failed to write HTML dump:", e)
+            #     import traceback
+            #     traceback.print_exc()
             found, details = await check_ticket_availability(html, log_file, check_count)
             check_count += 1
             if found:
