@@ -200,14 +200,14 @@ async def check_ticket_availability(html_content, log_file, check_count):
         found = "Layer 1: VisuallyHidden" in match_layers
         
         with open(log_file, "a") as f:
-            print("Writing results to log file...")
+            # print("Writing results to log file...")
             f.write(f"[{datetime.now()}] CHECK RESULT: {'FOUND' if found else 'NONE'}\n")
             for line in layer_results:
                 f.write(line + "\n")
             if jsonld_details:
                 f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
             f.write("-" * 60 + "\n")
-        print("Results written to log file.")
+        # print("Results written to log file.")
 
         return found, jsonld_details
     except Exception as e:
@@ -218,11 +218,11 @@ async def check_ticket_availability(html_content, log_file, check_count):
 
 # ---- Shutdown and Cleanup ----
 async def shutdown(browser):
-    print("Shutting down...")
+    # print("Shutting down...")
     try:
         if browser:
             await browser.close()
-            print("Browser closed.")
+            # print("Browser closed.")
     except Exception as e:
         print("Error during browser shutdown:", e)
         import traceback
@@ -368,6 +368,7 @@ async def check_tickets_loop(page, shutdown_event):
             found, details = await check_ticket_availability(html, log_file, check_count)
             check_count += 1
             if found:
+                print("Tickets found! Sending email alert...")
                 await send_email_alert(details, log_file)
             else:
                 print("No tickets found.")
