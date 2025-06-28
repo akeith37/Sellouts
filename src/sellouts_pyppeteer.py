@@ -76,7 +76,7 @@ async def check_ticket_availability(html_content, log_file, check_count):
             
         # --- Layer 1: VisuallyHidden result span (multiple occurrences) ---
         try:
-            print("Start Layer 1: VisuallyHidden result span (all occurrences)")
+            # print("Start Layer 1: VisuallyHidden result span (all occurrences)")
             vh_spans = soup.find_all('span', {'role': 'status', 'class': lambda c: c and 'VisuallyHidden' in c})
             if vh_spans:
                 vh_found = False
@@ -93,11 +93,11 @@ async def check_ticket_availability(html_content, log_file, check_count):
                 layer_results.append("[Layer 1: VisuallyHidden] No VisuallyHidden span found")
         except Exception as e:
             layer_results.append(f"[Layer 1: VisuallyHidden] ERROR: {e}")
-        print("Layer 1 (VisuallyHidden) check complete.")
+        # print("Layer 1 (VisuallyHidden) check complete.")
 
         # --- Layer 2: Result count span from UI indicator ---
         try:
-            print("Start Layer 2: resultCount span")
+            # print("Start Layer 2: resultCount span")
             result_span = soup.find('span', class_=lambda c: c and 'resultCount' in c)
             if result_span:
                 text = result_span.get_text(strip=True).lower()
@@ -112,11 +112,11 @@ async def check_ticket_availability(html_content, log_file, check_count):
                 layer_results.append("[Layer 2: resultCount] No resultCount span found")
         except Exception as e:
             layer_results.append(f"[Layer 2: resultCount] ERROR: {e}")
-        print("Layer 2 (resultCount) check complete.")
+        # print("Layer 2 (resultCount) check complete.")
 
         # --- Layer 3: Sold-Out Banner ---
         try:
-            print("Start Layer 3: sold-out banner")
+            # print("Start Layer 3: sold-out banner")
             banner = soup.find('span', {'data-testid': 'message-bar-text'})
             if banner:
                 banner_text = banner.get_text(strip=True).lower()
@@ -129,11 +129,11 @@ async def check_ticket_availability(html_content, log_file, check_count):
                 layer_results.append("[Layer 3: sold-out banner] No sold-out banner found")
         except Exception as e:
             layer_results.append(f"[Layer 3: sold-out banner] ERROR: {e}")
-        print("Layer 3 (sold-out banner) check complete.")
+        # print("Layer 3 (sold-out banner) check complete.")
 
         # --- Layer 4: JSON-LD ticket offer ---
         try:
-            print("Start Layer 4: JSON-LD ticket offers")
+            # print("Start Layer 4: JSON-LD ticket offers")
             scripts = soup.find_all("script", type="application/ld+json")
             found_in_json = False
             jsonld_details = []
@@ -181,11 +181,11 @@ async def check_ticket_availability(html_content, log_file, check_count):
                 layer_results.append("[Layer 4: JSON-LD] NO TICKETS (no matching offers)")
         except Exception as e:
             layer_results.append(f"[Layer 4: JSON-LD] ERROR: {e}")
-        print("Layer 4 (JSON-LD) check complete.")
+        # print("Layer 4 (JSON-LD) check complete.")
 
         # --- Layer 5: ticket-list UI block ---
         try:
-            print("Start Layer 5: ticket-list UI block")
+            # print("Start Layer 5: ticket-list UI block")
             ticket_list = soup.find(attrs={"data-testid": "ticket-list"})
             if ticket_list:
                 layer_results.append("[Layer 5: ticket-list UI] TICKETS POSSIBLY AVAILABLE (ticket-list UI found)")
@@ -194,7 +194,7 @@ async def check_ticket_availability(html_content, log_file, check_count):
                 layer_results.append("[Layer 5: ticket-list UI] NO TICKETS (ticket-list UI not found)")
         except Exception as e:
             layer_results.append(f"[Layer 5: ticket-list UI] ERROR: {e}")
-        print("Layer 5 (ticket-list UI) check complete.")
+        # print("Layer 5 (ticket-list UI) check complete.")
         
         # Only consider tickets found if Layer 1 (VisuallyHidden) passes because its the only one I'm confident in right now - confirmed for Ozzy and Lzzy
         found = "Layer 1: VisuallyHidden" in match_layers
@@ -204,12 +204,12 @@ async def check_ticket_availability(html_content, log_file, check_count):
             f.write(f"[{datetime.now()}] CHECK RESULT: {'FOUND' if found else 'NONE'}\n")
             for line in layer_results:
                 f.write(line + "\n")
-            if ticket_details:
-                f.write("Details:\n" + "\n".join(ticket_details) + "\n")
+            if jsonld_details:
+                f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
             f.write("-" * 60 + "\n")
         print("Results written to log file.")
 
-        return found, ticket_details
+        return found, jsonld_details
     except Exception as e:
         print("Error in check_ticket_availability:", e)
         import traceback
