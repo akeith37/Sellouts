@@ -30,7 +30,7 @@ RECIPIENT_EMAIL=os.getenv("RECIPIENT_EMAIL")
 CHECK_INTERVAL=60 #seconds between checking again
 ozzy_url="https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
 lzzy_url="https://www.ticketmaster.co.uk/halestorm-the-neverest-tour-cardiff-20-11-2025/event/360062978E2B0C80"
-TICKET_URL= ozzy_url
+TICKET_URL= lzzy_url
 
 # Check for required environment variables
 required_env_vars = [EMAIL_ADDRESS, EMAIL_PASSWORD, RECIPIENT_EMAIL]
@@ -78,6 +78,27 @@ async def check_ticket_availability(html_content, log_file, check_count):
         else:
             print(f"Page has been refreshed and checked again {check_count} time(s)")
             
+        # --- New Layer: VisuallyHidden result span (multiple occurrences) ---
+        try:
+            print("Start new layer: VisuallyHidden result span (all occurrences)")
+            vh_spans = soup.find_all('span', {'role': 'status', 'class': lambda c: c and 'VisuallyHidden' in c})
+            if vh_spans:
+                found_nonzero = False
+                for idx, vh_span in enumerate(vh_spans):
+                    vh_text = vh_span.get_text(strip=True)
+                    layer_results.append(f"[Layer VH] VisuallyHidden span #{idx+1}: '{vh_text}'")
+                    if not vh_text.lower().startswith("0 no results"):
+                        found_nonzero = True
+                if found_nonzero:
+                    match_layers.append("Layer VH")
+                else:
+                    layer_results.append("[Layer VH] All VisuallyHidden spans indicate 0 no results -> NO TICKETS.")
+            else:
+                layer_results.append("[Layer VH] VisuallyHidden span not found")
+        except Exception as e:
+            layer_results.append(f"[Layer VH] VisuallyHidden span: error - {e}")
+        print("New layer (VisuallyHidden) check complete.")
+
         # 1. Layer 1: Result count span from UI indicator
         try:
             print("Start layer 1 check: resultCount span")
@@ -169,7 +190,7 @@ async def check_ticket_availability(html_content, log_file, check_count):
         print("Layer 4 check complete.")
             
         # Only consider tickets found if Layer 1 passes because its the only one I'm confident in right now
-        found = "Layer 1" in match_layers
+        found = "Layer 1" in match_layers or "Layer VH" in match_layers
         
         with open(log_file, "a") as f:
             print("Writing results to log file...")
