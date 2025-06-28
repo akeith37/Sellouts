@@ -1,12 +1,8 @@
 import os
-import re
 import json
 import asyncio
-import signal
 import smtplib
 import shutil
-import tempfile
-import random
 from datetime import datetime
 from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
@@ -30,7 +26,7 @@ RECIPIENT_EMAIL=os.getenv("RECIPIENT_EMAIL")
 CHECK_INTERVAL=60 #seconds between checking again
 ozzy_url="https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
 lzzy_url="https://www.ticketmaster.co.uk/halestorm-the-neverest-tour-cardiff-20-11-2025/event/360062978E2B0C80"
-TICKET_URL= lzzy_url
+TICKET_URL= ozzy_url
 
 # Check for required environment variables
 required_env_vars = [EMAIL_ADDRESS, EMAIL_PASSWORD, RECIPIENT_EMAIL]
@@ -356,11 +352,11 @@ async def check_tickets_loop(page, shutdown_event):
         try:
             print(f"Checking tickets... (check count: {check_count})")
             await asyncio.wait_for(page.reload({'waitUntil': 'networkidle2'}), timeout=60)
-            print("reload complete")
+            # print("reload complete")
             await asyncio.wait_for(page.waitForSelector("script[type='application/ld+json']"), timeout=60)
-            print("waitForSelector complete")
+            # print("waitForSelector complete")
             html = await page.content()
-            print("Page content retrieved successfully.")
+            # print("Page content retrieved successfully.")
             # try:
             #     with open("html_dump_ozzy", "a") as f:
             #         f.write(html)
