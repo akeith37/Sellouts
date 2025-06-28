@@ -107,7 +107,7 @@ def send_email_alert(details):
             server.sendmail(EMAIL_ADDRESS, RECIPIENT_EMAIL, msg.as_string())
         print("Email sent!")
     except Exception as e:
-        print("Failt to send email:", e)
+        print("Failed to send email:", e)
         
 #Launch the browser and open the event page
 async def init_browser():
@@ -123,7 +123,7 @@ async def init_browser():
         "User-Agent": "Mozilla/5.0 (X11; Linux aarch64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/106.0.0.0 Safari/537.37"
     })
     await page.goto(TICKET_URL, {'waitUntil': 'networkidle2'})
-    print("Check broswer for CAPTCHA. Verify that you exist, wait for the next page to load, hit ENTER in the terminal to collect the HTML content")
+    print("Check browser for CAPTCHA. Verify that you exist, wait for the next page to load, hit ENTER in the terminal to collect the HTML content")
     input()
     await page.waitForSelector("script[type='application/ld+json']")
     return browser, page

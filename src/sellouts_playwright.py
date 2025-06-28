@@ -3,6 +3,7 @@ import re
 import json
 import asyncio
 import signal
+import smtplib
 from datetime import datetime
 from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
@@ -27,7 +28,7 @@ shutdown_event = asyncio.Event()
 # temp_user_data_dir = tempfile.mkdtemp() #Create temporary user data directory
 
 # ---- Email Alert
-async def send_email_alert(details, logfile):
+async def send_email_alert(details, log_file):
     subject = "Tickets Available!"
     body = f"Tickets have been found!\n{TICKET_URL}\n\nDetails:\n"
     body += "\n".join(details) if details else "(No extra details found)"
