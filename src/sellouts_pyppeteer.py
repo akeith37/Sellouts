@@ -3,6 +3,7 @@ import json
 import asyncio
 import smtplib
 import shutil
+import random
 from datetime import datetime
 from email.mime.text import MIMEText
 from bs4 import BeautifulSoup
@@ -23,7 +24,6 @@ load_dotenv()
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
-CHECK_INTERVAL = 10  # seconds between checking again
 
 TICKET_URL = "https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
 
@@ -336,9 +336,10 @@ async def check_tickets_loop(page, shutdown_event):
                 await send_email_alert(details, log_file)
             else:
                 print("No tickets found.")
-            print(f"Waiting {CHECK_INTERVAL} seconds...\n")
+            check_interval = random.uniform(4, 8)
+            print(f"Waiting {check_interval:.1f} seconds...\n")
             try:
-                await asyncio.wait_for(shutdown_event.wait(), timeout=CHECK_INTERVAL)
+                await asyncio.wait_for(shutdown_event.wait(), timeout=check_interval)
             except asyncio.TimeoutError:
                 pass  # Normal, just continue loop
         except asyncio.TimeoutError:
