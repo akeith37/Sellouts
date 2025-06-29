@@ -308,7 +308,7 @@ async def main():
         """)
         await page.goto(TICKET_URL, {
             'waitUntil': 'networkidle2',
-            'timeout': 60000
+            'timeout': 30000
         })
         await page.waitForSelector("script[type='application/ld+json']")
         await check_tickets_loop(page, shutdown_event)
