@@ -11,6 +11,7 @@ import warnings
 import pyppeteer
 from pyppeteer import launch
 from pyppeteer_stealth import stealth
+import signal
 
 
 # Suppress Pyppeteer shutdown coroutine warning
@@ -22,7 +23,7 @@ load_dotenv()
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
-CHECK_INTERVAL = 60  # seconds between checking again
+CHECK_INTERVAL = 15  # seconds between checking again
 
 TICKET_URL = "https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
 
@@ -218,6 +219,17 @@ async def main():
     chrome_path = get_chrome_path()
     browser = None
     shutdown_event = asyncio.Event()
+
+    def handle_signal(signum, frame):
+        print(f"\nReceived signal {signum}. Initiating shutdown...")
+        shutdown_event.set()
+
+    # Register signal handlers for graceful shutdown (CTRL+C, taskkill, etc.)
+    signal.signal(signal.SIGINT, handle_signal)   # CTRL+C
+    if hasattr(signal, 'SIGTERM'):
+        signal.signal(signal.SIGTERM, handle_signal)  # taskkill or kill
+    # NOTE: On Windows, CTRL+Z (SIGTSTP) is not supported and will not trigger cleanup. Use CTRL+C to exit cleanly.
+
     try:
         browser = await launch({
             "headless": False,
