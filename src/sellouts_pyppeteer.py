@@ -23,7 +23,7 @@ load_dotenv()
 EMAIL_ADDRESS = os.getenv("EMAIL_ADDRESS")
 EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
 RECIPIENT_EMAIL = os.getenv("RECIPIENT_EMAIL")
-CHECK_INTERVAL = 15  # seconds between checking again
+CHECK_INTERVAL = 5  # seconds between checking again
 
 TICKET_URL = "https://www.ticketmaster.co.uk/back-to-the-beginning-birmingham-05-07-2025/event/360062289EF011A5"
 
@@ -308,7 +308,7 @@ async def main():
         """)
         await page.goto(TICKET_URL, {
             'waitUntil': 'networkidle2',
-            'timeout': 60000
+            'timeout': 30000
         })
         await page.waitForSelector("script[type='application/ld+json']")
         await check_tickets_loop(page, shutdown_event)
