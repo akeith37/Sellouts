@@ -85,39 +85,7 @@ async def check_ticket_availability(html_content, log_file):
         except Exception as e:
             layer_results.append(f"[Layer 1: VisuallyHidden] ERROR: {e}")
 
-        # --- Layer 2: Result count span from UI indicator ---
-        # try:
-        #     result_span = soup.find('span', class_=lambda c: c and 'resultCount' in c)
-        #     if result_span:
-        #         text = result_span.get_text(strip=True).lower()
-        #         if text.startswith("0 no results"):
-        #             layer_results.append(f"[Layer 2: resultCount] NO TICKETS (text: '{text}')")
-        #         elif "result" in text and "no" not in text:
-        #             layer_results.append(f"[Layer 2: resultCount] TICKETS POSSIBLY AVAILABLE (text: '{text}')")
-        #             match_layers.append("Layer 2: resultCount")
-        #         else:
-        #             layer_results.append(f"[Layer 2: resultCount] UNRECOGNIZED RESULT (text: '{text}')")
-        #     else:
-        #         layer_results.append("[Layer 2: resultCount] No resultCount span found")
-        # except Exception as e:
-        #     layer_results.append(f"[Layer 2: resultCount] ERROR: {e}")
-
-        # --- Layer 3: Sold-Out Banner ---
-        # try:
-        #     banner = soup.find('span', {'data-testid': 'message-bar-text'})
-        #     if banner:
-        #         banner_text = banner.get_text(strip=True).lower()
-        #         if "no tickets currently available" in banner_text:
-        #             layer_results.append(f"[Layer 3: sold-out banner] NO TICKETS (text: '{banner_text}')")
-        #         else:
-        #             layer_results.append(f"[Layer 3: sold-out banner] TICKETS POSSIBLY AVAILABLE (text: '{banner_text}')")
-        #             match_layers.append("Layer 3: sold-out banner")
-        #     else:
-        #         layer_results.append("[Layer 3: sold-out banner] No sold-out banner found")
-        # except Exception as e:
-        #     layer_results.append(f"[Layer 3: sold-out banner] ERROR: {e}")
-
-        # --- Layer 4: JSON-LD ticket offer ---
+        # --- Layer 2: JSON-LD ticket offer ---
         try:
             scripts = soup.find_all("script", type="application/ld+json")
             found_in_json = False
@@ -157,25 +125,14 @@ async def check_ticket_availability(html_content, log_file):
                 except Exception:
                     continue
             if found_in_json:
-                layer_results.append("[Layer 4: JSON-LD] TICKETS POSSIBLY AVAILABLE (InStock offer found)")
-                match_layers.append("Layer 4: JSON-LD")
+                layer_results.append("[Layer 2: JSON-LD] TICKETS POSSIBLY AVAILABLE (InStock offer found)")
+                match_layers.append("Layer 2: JSON-LD")
                 if jsonld_details:
-                    layer_results.extend([f"[Layer 4: JSON-LD] {d}" for d in jsonld_details])
+                    layer_results.extend([f"[Layer 2: JSON-LD] {d}" for d in jsonld_details])
             else:
-                layer_results.append("[Layer 4: JSON-LD] NO TICKETS (no matching offers)")
+                layer_results.append("[Layer 2: JSON-LD] NO TICKETS (no matching offers)")
         except Exception as e:
-            layer_results.append(f"[Layer 4: JSON-LD] ERROR: {e}")
-
-        # --- Layer 5: ticket-list UI block ---
-        # try:
-        #     ticket_list = soup.find(attrs={"data-testid": "ticket-list"})
-        #     if ticket_list:
-        #         layer_results.append("[Layer 5: ticket-list UI] TICKETS POSSIBLY AVAILABLE (ticket-list UI found)")
-        #         match_layers.append("Layer 5: ticket-list UI")
-        #     else:
-        #         layer_results.append("[Layer 5: ticket-list UI] NO TICKETS (ticket-list UI not found)")
-        # except Exception as e:
-        #     layer_results.append(f"[Layer 5: ticket-list UI] ERROR: {e}")
+            layer_results.append(f"[Layer 2: JSON-LD] ERROR: {e}")
 
         # Only consider tickets found if Layer 1 (VisuallyHidden) passes (confirmed for Ozzy and Lzzy)
         found = "Layer 1: VisuallyHidden" in match_layers
@@ -228,7 +185,6 @@ async def main():
     signal.signal(signal.SIGINT, handle_signal)   # CTRL+C
     if hasattr(signal, 'SIGTERM'):
         signal.signal(signal.SIGTERM, handle_signal)  # taskkill or kill
-    # NOTE: On Windows, CTRL+Z (SIGTSTP) is not supported and will not trigger cleanup. Use CTRL+C to exit cleanly.
 
     try:
         browser = await launch({
@@ -326,8 +282,8 @@ async def check_tickets_loop(page, shutdown_event):
     while not shutdown_event.is_set():
         try:
             print(f"Checking tickets... (check count: {check_count})")
-            await asyncio.wait_for(page.reload({'waitUntil': 'networkidle2'}), timeout=60)
-            await asyncio.wait_for(page.waitForSelector("script[type='application/ld+json']"), timeout=60)
+            await asyncio.wait_for(page.reload({'waitUntil': 'networkidle2'}), timeout=45)
+            await asyncio.wait_for(page.waitForSelector("script[type='application/ld+json']"), timeout=45)
             html = await page.content()
             found, details = await check_ticket_availability(html, log_file)
             check_count += 1
@@ -341,7 +297,7 @@ async def check_tickets_loop(page, shutdown_event):
             try:
                 await asyncio.wait_for(shutdown_event.wait(), timeout=check_interval)
             except asyncio.TimeoutError:
-                pass  # Normal, just continue loop
+                pass
         except asyncio.TimeoutError:
             print("Timeout occurred while waiting for page reload, selector, or interval.")
             import traceback
