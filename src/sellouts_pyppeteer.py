@@ -336,7 +336,7 @@ async def check_tickets_loop(page, shutdown_event):
                 await send_email_alert(details, log_file)
             else:
                 print("No tickets found.")
-            check_interval = random.uniform(4, 8)
+            check_interval = random.uniform(2, 5)
             print(f"Waiting {check_interval:.1f} seconds...\n")
             try:
                 await asyncio.wait_for(shutdown_event.wait(), timeout=check_interval)
