@@ -160,7 +160,7 @@ async def check_ticket_availability(html_content, log_file):
                     f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
                 f.write(f"HTML snapshot saved to: {html_filename}\n")
                 f.write("-" * 60 + "\n")
-        print("Results written to log file." if found else "No tickets found. Log not updated.")
+            print("Results written to log file.")
 
         return found, jsonld_details if found else []
     except Exception as e:
