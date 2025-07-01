@@ -35,6 +35,10 @@ if not all(required_env_vars):
 user_data_dir = os.path.join(os.getcwd(), 'user_data')  # Persistent user-data directory for cookies/session
 os.makedirs(user_data_dir, exist_ok=True)
 
+# Log the program start time
+with open("sellouts_log.txt", "a") as f:
+    f.write(f"[START] Program started at {datetime.now()}\n")
+
 # ---- Email Alert ----
 async def send_email_alert(details, log_file):
     subject = "Tickets Available!"
@@ -136,14 +140,16 @@ async def check_ticket_availability(html_content, log_file):
             except Exception as e:
                 layer_results.append(f"[Layer 2: JSON-LD] ERROR: {e}")
 
-        with open(log_file, "a") as f:
-            f.write(f"[{datetime.now()}] CHECK RESULT: {'FOUND' if found else 'NONE'}\n")
-            for line in layer_results:
-                f.write(line + "\n")
-            if found and jsonld_details:
-                f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
-            f.write("-" * 60 + "\n")
-        print("Results written to log file.")
+        # Only write to log if tickets are found
+        if found:
+            with open(log_file, "a") as f:
+                f.write(f"[{datetime.now()}] TICKETS FOUND\n")
+                for line in layer_results:
+                    f.write(line + "\n")
+                if jsonld_details:
+                    f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
+                f.write("-" * 60 + "\n")
+        print("Results written to log file." if found else "No tickets found. Log not updated.")
 
         return found, jsonld_details if found else []
     except Exception as e:
