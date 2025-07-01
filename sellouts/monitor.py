@@ -65,6 +65,7 @@ async def check_ticket_availability(html_content, log_file):
         match_layers = []
         layer_results = []
         jsonld_details = []
+        found = False
 
         # --- Layer 1: VisuallyHidden result span (multiple occurrences) ---
         try:
@@ -80,73 +81,71 @@ async def check_ticket_availability(html_content, log_file):
                         vh_found = True
                 if vh_found:
                     match_layers.append("Layer 1: VisuallyHidden")
+                    found = True
             else:
                 layer_results.append("[Layer 1: VisuallyHidden] No VisuallyHidden span found")
         except Exception as e:
             layer_results.append(f"[Layer 1: VisuallyHidden] ERROR: {e}")
 
-        # --- Layer 2: JSON-LD ticket offer ---
-        try:
-            scripts = soup.find_all("script", type="application/ld+json")
-            found_in_json = False
-            for script in scripts:
-                try:
-                    if not script.string:
-                        continue
-                    data = json.loads(script.string.strip())
-                    entries = data if isinstance(data, list) else [data]
-                    for entry in entries:
-                        if entry.get("@type") != "MusicEvent":
+        # Only run Layer 2 (JSON-LD) if tickets found in Layer 1
+        if found:
+            try:
+                scripts = soup.find_all("script", type="application/ld+json")
+                found_in_json = False
+                for script in scripts:
+                    try:
+                        if not script.string:
                             continue
-                        # Extract event info
-                        event_name = entry.get("name")
-                        event_date = entry.get("startDate")
-                        venue = entry.get("location", {}).get("name")
-                        address = entry.get("location", {}).get("address", {}).get("streetAddress")
-                        city = entry.get("location", {}).get("address", {}).get("addressLocality")
-                        offers = entry.get("offers")
-                        if not offers:
-                            continue
-                        offers = offers if isinstance(offers, list) else [offers]
-                        for offer in offers:
-                            if not isinstance(offer, dict):
+                        data = json.loads(script.string.strip())
+                        entries = data if isinstance(data, list) else [data]
+                        for entry in entries:
+                            if entry.get("@type") != "MusicEvent":
                                 continue
-                            availability = offer.get("availability")
-                            url = offer.get("url")
-                            price = offer.get("price")
-                            currency = offer.get("priceCurrency")
-                            description = offer.get("description")
-                            # Compose details string
-                            details_str = f"Event: {event_name} | Date: {event_date} | Venue: {venue}, {address}, {city} | "
-                            details_str += f"Availability: {availability} | URL: {url} | Price: {price or 'N/A'} {currency or ''} | Description: {description or 'N/A'}"
-                            jsonld_details.append(details_str)
-                            if availability == "http://schema.org/InStock":
+                            # Extract event info
+                            event_name = entry.get("name")
+                            event_date = entry.get("startDate")
+                            venue = entry.get("location", {}).get("name")
+                            address = entry.get("location", {}).get("address", {}).get("streetAddress")
+                            city = entry.get("location", {}).get("address", {}).get("addressLocality")
+                            offers = entry.get("offers")
+                            if not offers:
+                                continue
+                            offers = offers if isinstance(offers, list) else [offers]
+                            for offer in offers:
+                                if not isinstance(offer, dict):
+                                    continue
+                                availability = offer.get("availability")
+                                url = offer.get("url")
+                                price = offer.get("price")
+                                currency = offer.get("priceCurrency")
+                                description = offer.get("description")
+                                # Compose details string
+                                details_str = f"Event: {event_name} | Date: {event_date} | Venue: {venue}, {address}, {city} | "
+                                details_str += f"Availability: {availability} | URL: {url} | Price: {price or 'N/A'} {currency or ''} | Description: {description or 'N/A'}"
+                                jsonld_details.append(details_str)
                                 found_in_json = True
-                except Exception:
-                    continue
-            if found_in_json:
-                layer_results.append("[Layer 2: JSON-LD] TICKETS POSSIBLY AVAILABLE (InStock offer found)")
-                match_layers.append("Layer 2: JSON-LD")
-                if jsonld_details:
-                    layer_results.extend([f"[Layer 2: JSON-LD] {d}" for d in jsonld_details])
-            else:
-                layer_results.append("[Layer 2: JSON-LD] NO TICKETS (no matching offers)")
-        except Exception as e:
-            layer_results.append(f"[Layer 2: JSON-LD] ERROR: {e}")
-
-        # Only consider tickets found if Layer 1 (VisuallyHidden) passes (confirmed for Ozzy and Lzzy)
-        found = "Layer 1: VisuallyHidden" in match_layers
+                    except Exception:
+                        continue
+                if found_in_json:
+                    layer_results.append("[Layer 2: JSON-LD] Ticket details extracted from JSON-LD.")
+                    match_layers.append("Layer 2: JSON-LD")
+                    if jsonld_details:
+                        layer_results.extend([f"[Layer 2: JSON-LD] {d}" for d in jsonld_details])
+                else:
+                    layer_results.append("[Layer 2: JSON-LD] No ticket details found in JSON-LD.")
+            except Exception as e:
+                layer_results.append(f"[Layer 2: JSON-LD] ERROR: {e}")
 
         with open(log_file, "a") as f:
             f.write(f"[{datetime.now()}] CHECK RESULT: {'FOUND' if found else 'NONE'}\n")
             for line in layer_results:
                 f.write(line + "\n")
-            if jsonld_details:
+            if found and jsonld_details:
                 f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
             f.write("-" * 60 + "\n")
         print("Results written to log file.")
 
-        return found, jsonld_details
+        return found, jsonld_details if found else []
     except Exception as e:
         print("Error in check_ticket_availability:", e)
         import traceback
