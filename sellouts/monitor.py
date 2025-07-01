@@ -123,9 +123,25 @@ async def check_ticket_availability(html_content, log_file):
                                 price = offer.get("price")
                                 currency = offer.get("priceCurrency")
                                 description = offer.get("description")
-                                # Compose details string
+                                # Try to get seat info from offer or description
+                                seat_info = offer.get("name") or description or ""
+                                # Fallback: scrape seat info from HTML aria-labels
+                                if not seat_info:
+                                    # Look for divs with aria-label containing section/row/standing info
+                                    seat_divs = soup.find_all('div', attrs={'aria-label': True})
+                                    for div in seat_divs:
+                                        aria = div['aria-label']
+                                        if 'section' in aria.lower() or 'row' in aria.lower() or 'standing' in aria.lower() or 'circle' in aria.lower() or 'pitch' in aria.lower() or 'general admission' in aria.lower():
+                                            seat_info = aria
+                                            # Try to extract price from aria-label as well
+                                            import re
+                                            price_match = re.search(r'\u00a3([\d,.]+)', aria)
+                                            if price_match:
+                                                price = price_match.group(1)
+                                                currency = 'GBP'
+                                            break
                                 details_str = f"Event: {event_name} | Date: {event_date} | Venue: {venue}, {address}, {city} | "
-                                details_str += f"Availability: {availability} | URL: {url} | Price: {price or 'N/A'} {currency or ''} | Description: {description or 'N/A'}"
+                                details_str += f"Availability: {availability} | URL: {url} | Price: {price or 'N/A'} {currency or ''} | Seat: {seat_info or 'N/A'} | Description: {description or 'N/A'}"
                                 jsonld_details.append(details_str)
                                 found_in_json = True
                     except Exception:
