@@ -156,26 +156,26 @@ async def check_ticket_availability(html_content, log_file):
             except Exception as e:
                 layer_results.append(f"[Layer 2: JSON-LD] ERROR: {e}")
 
-        # Only write to log if tickets are found
-        if found:
-            # Save HTML content to a new uniquely named file with timestamp and a counter
-            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-            counter = 1
-            base_filename = f"tickets_found_{timestamp}"
-            html_filename = f"{base_filename}.txt"
-            while os.path.exists(html_filename):
-                html_filename = f"{base_filename}_{counter}.txt"
-                counter += 1
-            with open(html_filename, "w", encoding="utf-8") as html_file:
-                html_file.write(html_content)
-            with open(log_file, "a") as f:
-                f.write(f"[{datetime.now()}] TICKETS FOUND\n")
-                for line in layer_results:
-                    f.write(line + "\n")
-                if jsonld_details:
-                    f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
-                f.write(f"HTML snapshot saved to: {html_filename}\n")
-                f.write("-" * 60 + "\n")
+        # # Only write to log if tickets are found
+        # if found:
+        #     # Save HTML content to a new uniquely named file with timestamp and a counter
+        #     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        #     counter = 1
+        #     base_filename = f"tickets_found_{timestamp}"
+        #     html_filename = f"{base_filename}.txt"
+        #     while os.path.exists(html_filename):
+        #         html_filename = f"{base_filename}_{counter}.txt"
+        #         counter += 1
+        #     with open(html_filename, "w", encoding="utf-8") as html_file:
+        #         html_file.write(html_content)
+        #     with open(log_file, "a") as f:
+        #         f.write(f"[{datetime.now()}] TICKETS FOUND\n")
+        #         for line in layer_results:
+        #             f.write(line + "\n")
+        #         if jsonld_details:
+        #             f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
+        #         f.write(f"HTML snapshot saved to: {html_filename}\n")
+        #         f.write("-" * 60 + "\n")
             print("Results written to log file.")
 
         return found, jsonld_details if found else []
