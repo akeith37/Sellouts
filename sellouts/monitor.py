@@ -91,11 +91,12 @@ async def check_ticket_availability(html_content, log_file):
         except Exception as e:
             layer_results.append(f"[Layer 1: VisuallyHidden] ERROR: {e}")
 
-        # Only run Layer 2 (JSON-LD) if tickets found in Layer 1
+        # Only run Layer 2 (HTML seat/price extraction) if tickets found in Layer 1
         if found:
             try:
+                # Get event/venue/date from JSON-LD (first MusicEvent found)
+                event_name = event_date = venue = address = city = None
                 scripts = soup.find_all("script", type="application/ld+json")
-                found_in_json = False
                 for script in scripts:
                     try:
                         if not script.string:
@@ -103,58 +104,48 @@ async def check_ticket_availability(html_content, log_file):
                         data = json.loads(script.string.strip())
                         entries = data if isinstance(data, list) else [data]
                         for entry in entries:
-                            if entry.get("@type") != "MusicEvent":
-                                continue
-                            # Extract event info
-                            event_name = entry.get("name")
-                            event_date = entry.get("startDate")
-                            venue = entry.get("location", {}).get("name")
-                            address = entry.get("location", {}).get("address", {}).get("streetAddress")
-                            city = entry.get("location", {}).get("address", {}).get("addressLocality")
-                            offers = entry.get("offers")
-                            if not offers:
-                                continue
-                            offers = offers if isinstance(offers, list) else [offers]
-                            for offer in offers:
-                                if not isinstance(offer, dict):
-                                    continue
-                                availability = offer.get("availability")
-                                url = offer.get("url")
-                                price = offer.get("price")
-                                currency = offer.get("priceCurrency")
-                                description = offer.get("description")
-                                # Try to get seat info from offer or description
-                                seat_info = offer.get("name") or description or ""
-                                # Fallback: scrape seat info from HTML aria-labels
-                                if not seat_info:
-                                    # Look for divs with aria-label containing section/row/standing info
-                                    seat_divs = soup.find_all('div', attrs={'aria-label': True})
-                                    for div in seat_divs:
-                                        aria = div['aria-label']
-                                        if 'section' in aria.lower() or 'row' in aria.lower() or 'standing' in aria.lower() or 'circle' in aria.lower() or 'pitch' in aria.lower() or 'general admission' in aria.lower():
-                                            seat_info = aria
-                                            # Try to extract price from aria-label as well
-                                            import re
-                                            price_match = re.search(r'\u00a3([\d,.]+)', aria)
-                                            if price_match:
-                                                price = price_match.group(1)
-                                                currency = 'GBP'
-                                            break
-                                details_str = f"Event: {event_name} | Date: {event_date} | Venue: {venue}, {address}, {city} | "
-                                details_str += f"Availability: {availability} | URL: {url} | Price: {price or 'N/A'} {currency or ''} | Seat: {seat_info or 'N/A'} | Description: {description or 'N/A'}"
-                                jsonld_details.append(details_str)
-                                found_in_json = True
+                            if entry.get("@type") == "MusicEvent":
+                                event_name = entry.get("name")
+                                event_date = entry.get("startDate")
+                                venue = entry.get("location", {}).get("name")
+                                address = entry.get("location", {}).get("address", {}).get("streetAddress")
+                                city = entry.get("location", {}).get("address", {}).get("addressLocality")
+                                break
+                        if event_name:
+                            break
                     except Exception:
                         continue
-                if found_in_json:
-                    layer_results.append("[Layer 2: JSON-LD] Ticket details extracted from JSON-LD.")
-                    match_layers.append("Layer 2: JSON-LD")
-                    if jsonld_details:
-                        layer_results.extend([f"[Layer 2: JSON-LD] {d}" for d in jsonld_details])
+                # Scan all divs with aria-label for seat/price info
+                seat_divs = soup.find_all('div', attrs={'aria-label': True})
+                import re
+                found_seat = False
+                for div in seat_divs:
+                    aria = div['aria-label']
+                    aria_lower = aria.lower()
+                    if any(k in aria_lower for k in ["section", "row", "standing", "circle", "pitch", "general admission"]):
+                        # Extract price (e.g. £332.22 or $100.00)
+                        price_match = re.search(r'[£$€]([\d,.]+)', aria)
+                        price = price_match.group(1) if price_match else 'N/A'
+                        currency = ''
+                        if '£' in aria: currency = 'GBP'
+                        elif '$' in aria: currency = 'USD'
+                        elif '€' in aria: currency = 'EUR'
+                        # Extract seat info (remove price and 'Select Resale Tickets' etc)
+                        seat_info = aria
+                        seat_info = re.sub(r'Select (Resale )?Tickets', '', seat_info, flags=re.I).strip()
+                        seat_info = re.sub(r'^[£$€][\d,.]+,?\s*', '', seat_info).strip()
+                        details_str = f"Event: {event_name or 'N/A'} | Date: {event_date or 'N/A'} | Venue: {venue or 'N/A'}, {address or ''}, {city or ''} | "
+                        details_str += f"Price: {price} {currency} | Seat: {seat_info}"
+                        jsonld_details.append(details_str)
+                        found_seat = True
+                if found_seat:
+                    layer_results.append("[Layer 2: HTML] Ticket seat/price details extracted from HTML.")
+                    match_layers.append("Layer 2: HTML")
+                    layer_results.extend([f"[Layer 2: HTML] {d}" for d in jsonld_details])
                 else:
-                    layer_results.append("[Layer 2: JSON-LD] No ticket details found in JSON-LD.")
+                    layer_results.append("[Layer 2: HTML] No seat/price details found in HTML.")
             except Exception as e:
-                layer_results.append(f"[Layer 2: JSON-LD] ERROR: {e}")
+                layer_results.append(f"[Layer 2: HTML] ERROR: {e}")
 
         # # Only write to log if tickets are found
         # if found:
@@ -176,7 +167,7 @@ async def check_ticket_availability(html_content, log_file):
         #             f.write("Details:\n" + "\n".join(jsonld_details) + "\n")
         #         f.write(f"HTML snapshot saved to: {html_filename}\n")
         #         f.write("-" * 60 + "\n")
-            print("Results written to log file.")
+            # print("Results written to log file.")
 
         return found, jsonld_details if found else []
     except Exception as e:
